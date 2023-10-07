@@ -7,13 +7,21 @@ If anyone else wants to use this fork, keep in mind that there is a **dangerous 
 1. If you haven't already, download the [NDK](https://developer.android.com/ndk/downloads) and extract it
 2. Make sure `CMAKE_ANDROID_NDK` in the [toolchain file](android-toolchain.cmake) is set to the NDK directory
 3. If you want to, change the android API version (`CMAKE_SYSTEM_VERSION`) or architecture (`CMAKE_ANDROID_ARCH_ABI`) in that toolchain file
-4. Run cmake using the toolchain file
+4. Set the env variable `ANDROID_NDK_ROOT` to your NDK directory and build openssl
+   ```sh
+   cd openssl
+   PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin:$ANDROID_NDK_ROOT/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/bin:$PATH
+   ./Configure android-arm64 -D__ANDROID_API__=34 # if you need to, here you can change the API verson
+   make
+   cd ..
+   ```
+5. Run cmake using the toolchain file
    ```sh
    mkdir build
    cd build
    cmake -DCMAKE_TOOLCHAIN_FILE=../android-toolchain.cmake ..
    ```
-5. Start the build and hope for the best
+6. Start the build and hope for the best
    ```sh
    cmake --build .
    ```
