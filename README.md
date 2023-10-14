@@ -1,5 +1,5 @@
 # What the fork?
-This is my fork of [openssl](https://github.com/openssl/openssl/).
+This is my fork of [libgit2](https://github.com/libgit2/libgit2).
 If anyone else wants to use this fork, keep in mind that there is a **dangerous workaround** in [`src/libgit2/repository.c`](src/libgit2/repository.c). To revert it, checkout [b85ce6a](https://github.com/jakubslaby09/libgit2-android/commit/b85ce6a46d4aa953f2643ad4ba9e8f60f6bd9993).
 
 ## Building with Android NDK
