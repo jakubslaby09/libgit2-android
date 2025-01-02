@@ -10,3 +10,4 @@ list(APPEND CMAKE_FIND_ROOT_PATH openssl/include)
 
 add_definitions(-Wno-int-conversion)
 add_compile_options(-Wno-int-conversion)
+add_compile_options(-Wno-implicit-function-declaration)
