@@ -1,6 +1,6 @@
 # What the fork?
 This is my fork of [libgit2](https://github.com/libgit2/libgit2).
-If anyone else wants to use this fork, keep in mind that there is a **dangerous workaround** in [`src/libgit2/repository.c`](src/libgit2/repository.c). To revert it, checkout [b85ce6a](https://github.com/jakubslaby09/libgit2-android/commit/b85ce6a46d4aa953f2643ad4ba9e8f60f6bd9993).
+If anyone else wants to use this fork, keep in mind that there is a **dangerous workaround** in [`src/libgit2/repository.c`](src/libgit2/repository.c). If you do not need it, use the [official repo](https://github.com/libgit2/libgit2).
 
 ## Building with Android NDK
 0. Read the [warning above](#what-the-fork)!
@@ -11,8 +11,8 @@ If anyone else wants to use this fork, keep in mind that there is a **dangerous 
    ```sh
    cd openssl
    PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin:$ANDROID_NDK_ROOT/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/bin:$PATH
-   ./Configure android-arm64 -D__ANDROID_API__=34 # if you need to, here you can change the API verson
-   make
+   ./Configure android-arm64 -D__ANDROID_API__=34 # if you need to, you can change the API verson here
+   make -s -Wno-macro-redefined
    cd ..
    ```
 5. Run cmake using the toolchain file
