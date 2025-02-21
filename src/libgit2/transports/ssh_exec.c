@@ -132,6 +132,22 @@ static int get_ssh_cmdline(
 	const char *default_ssh_cmd = "ssh";
 	int error;
 
+	/*
+	 * Safety check: like git, we forbid paths that look like an
+	 * option as that could lead to injection to ssh that can make
+	 * us do unexpected things
+	 */
+	if (git_process__is_cmdline_option(url->username)) {
+		git_error_set(GIT_ERROR_NET, "cannot ssh: username '%s' is ambiguous with command-line option", url->username);
+		return -1;
+	} else if (git_process__is_cmdline_option(url->host)) {
+		git_error_set(GIT_ERROR_NET, "cannot ssh: host '%s' is ambiguous with command-line option", url->host);
+		return -1;
+	} else if (git_process__is_cmdline_option(url->path)) {
+		git_error_set(GIT_ERROR_NET, "cannot ssh: path '%s' is ambiguous with command-line option", url->path);
+		return -1;
+	}
+
 	if ((error = git_repository_config_snapshot(&cfg, repo)) < 0)
 		return error;
 
@@ -142,9 +158,10 @@ static int get_ssh_cmdline(
 	else if ((error = git_config__get_string_buf(&ssh_cmd, cfg, "core.sshcommand")) < 0 && error != GIT_ENOTFOUND)
 		goto done;
 
-	error = git_str_printf(out, "%s -p %s \"%s%s%s\" \"%s\" \"%s\"",
+	error = git_str_printf(out, "%s %s %s \"%s%s%s\" \"%s\" \"%s\"",
 		ssh_cmd.size > 0 ? ssh_cmd.ptr : default_ssh_cmd,
-		url->port,
+		url->port_specified ? "-p" : "",
+		url->port_specified ? url->port : "",
 		url->username ? url->username : "",
 		url->username ? "@" : "",
 		url->host,

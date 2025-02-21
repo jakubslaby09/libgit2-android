@@ -11,10 +11,10 @@
 typedef struct git_process git_process;
 
 typedef struct {
-	int capture_in  : 1,
-	    capture_out : 1,
-	    capture_err : 1,
-	    exclude_env : 1;
+	unsigned int capture_in  : 1,
+	             capture_out : 1,
+	             capture_err : 1,
+	             exclude_env : 1;
 
 	char *cwd;
 } git_process_options;
@@ -105,6 +105,17 @@ extern int git_process__cmdline(
 	size_t in_len);
 
 #endif
+
+/*
+ * Whether the given string looks like a command line option (starts
+ * with a dash). This is useful for examining strings that will become
+ * cmdline arguments to ensure that they are not erroneously treated
+ * as an option. For example, arguments to `ssh`.
+ */
+GIT_INLINE(bool) git_process__is_cmdline_option(const char *str)
+{
+	return (str && str[0] == '-');
+}
 
 /**
  * Start the process.

@@ -6,12 +6,14 @@ set -eo pipefail
 # parse the command line
 #
 
-usage() { echo "usage: $(basename "$0") [--cli <path>] [--baseline-cli <path>] [--suite <suite>] [--json <path>] [--zip <path>] [--verbose] [--debug]"; }
+usage() { echo "usage: $(basename "$0") [--cli <path>] [--name <cli-name>] [--baseline-cli <path>] [--suite <suite>] [--json <path>] [--flamegraph] [--zip <path>] [--verbose] [--debug]"; }
 
 TEST_CLI="git"
+TEST_CLI_NAME=
 BASELINE_CLI=
 SUITE=
 JSON_RESULT=
+FLAMEGRAPH=
 ZIP_RESULT=
 OUTPUT_DIR=
 VERBOSE=
@@ -21,6 +23,9 @@ NEXT=
 for a in "$@"; do
 	if [ "${NEXT}" = "cli" ]; then
 		TEST_CLI="${a}"
+		NEXT=
+	elif [ "${NEXT}" = "name" ]; then
+		TEST_CLI_NAME="${a}"
 		NEXT=
 	elif [ "${NEXT}" = "baseline-cli" ]; then
 		BASELINE_CLI="${a}"
@@ -41,6 +46,10 @@ for a in "$@"; do
 		NEXT="cli"
 	elif [[ "${a}" == "-c"* ]]; then
 		TEST_CLI="${a/-c/}"
+	elif [ "${a}" = "n" ] || [ "${a}" = "--name" ]; then
+		NEXT="name"
+	elif [[ "${a}" == "-n"* ]]; then
+		TEST_CLI_NAME="${a/-n/}"
 	elif [ "${a}" = "b" ] || [ "${a}" = "--baseline-cli" ]; then
 		NEXT="baseline-cli"
 	elif [[ "${a}" == "-b"* ]]; then
@@ -58,6 +67,8 @@ for a in "$@"; do
 		NEXT="json"
 	elif [[ "${a}" == "-j"* ]]; then
 		JSON_RESULT="${a/-j/}"
+	elif [ "${a}" = "-F" ] || [ "${a}" == "--flamegraph" ]; then
+		FLAMEGRAPH=1
 	elif [ "${a}" = "-z" ] || [ "${a}" == "--zip" ]; then
 		NEXT="zip"
 	elif [[ "${a}" == "-z"* ]]; then
@@ -92,11 +103,11 @@ SYSTEM_KERNEL=$(uname -v)
 
 fullpath() {
 	if [[ "$(uname -s)" == "MINGW"* && $(cygpath -u "${TEST_CLI}") == "/"* ]]; then
-		echo "${TEST_CLI}"
+		echo "$1"
 	elif [[ "${TEST_CLI}" == "/"* ]]; then
-		echo "${TEST_CLI}"
+		echo "$1"
 	else
-		which "${TEST_CLI}"
+		which "$1"
 	fi
 }
 
@@ -108,9 +119,20 @@ cli_version() {
 	fi
 }
 
+cli_commit() {
+	if [[ "$(uname -s)" == "MINGW"* ]]; then
+		BUILD_OPTIONS=$($(cygpath -u "$1") version --build-options)
+	else
+		BUILD_OPTIONS=$("$1" version --build-options)
+	fi
+
+	echo "${BUILD_OPTIONS}" | grep '^built from commit: ' | sed -e 's/^built from commit: //'
+}
+
 TEST_CLI_NAME=$(basename "${TEST_CLI}")
 TEST_CLI_PATH=$(fullpath "${TEST_CLI}")
 TEST_CLI_VERSION=$(cli_version "${TEST_CLI}")
+TEST_CLI_COMMIT=$(cli_commit "${TEST_CLI}")
 
 if [ "${BASELINE_CLI}" != "" ]; then
 	if [[ "${BASELINE_CLI}" == "/"* ]]; then
@@ -122,6 +144,7 @@ if [ "${BASELINE_CLI}" != "" ]; then
 	BASELINE_CLI_NAME=$(basename "${BASELINE_CLI}")
 	BASELINE_CLI_PATH=$(fullpath "${BASELINE_CLI}")
 	BASELINE_CLI_VERSION=$(cli_version "${BASELINE_CLI}")
+	BASELINE_CLI_COMMIT=$(cli_commit "${BASELINE_CLI}")
 fi
 
 #
@@ -201,13 +224,24 @@ for TEST_PATH in "${BENCHMARK_DIR}"/*; do
 	fi
 
 	OUTPUT_FILE="${OUTPUT_DIR}/${TEST_FILE}.out"
-	JSON_FILE="${OUTPUT_DIR}/${TEST_FILE}.json"
 	ERROR_FILE="${OUTPUT_DIR}/${TEST_FILE}.err"
+	JSON_FILE="${OUTPUT_DIR}/${TEST_FILE}.json"
+	FLAMEGRAPH_FILE="${OUTPUT_DIR}/${TEST_FILE}.svg"
 
 	FAILED=
-	${TEST_PATH} --cli "${TEST_CLI}" --baseline-cli "${BASELINE_CLI}" --json "${JSON_FILE}" ${SHOW_OUTPUT} >"${OUTPUT_FILE}" 2>"${ERROR_FILE}" || FAILED=1
+	{
+	  ${TEST_PATH} --cli "${TEST_CLI}" --baseline-cli "${BASELINE_CLI}" --json "${JSON_FILE}" ${SHOW_OUTPUT} >"${OUTPUT_FILE}" 2>"${ERROR_FILE}";
+	  FAILED=$?
+	} || true
 
-	if [ "${FAILED}" = "1" ]; then
+	if [ "${FAILED}" = "2" ]; then
+		if [ "${VERBOSE}" != "1" ]; then
+			echo "skipped!"
+		fi
+
+		indent < "${ERROR_FILE}"
+		continue
+	elif [ "${FAILED}" != "0" ]; then
 		if [ "${VERBOSE}" != "1" ]; then
 			echo "failed!"
 		fi
@@ -230,15 +264,54 @@ for TEST_PATH in "${BENCHMARK_DIR}"/*; do
 				two_mean=$(humanize_secs "${two_mean}")
 				two_stddev=$(humanize_secs "${two_stddev}")
 
-				echo "${one_mean} ± ${one_stddev}  vs  ${two_mean} ± ${two_stddev}"
+				echo -n "${one_mean} ± ${one_stddev}  vs  ${two_mean} ± ${two_stddev}"
 			else
-				echo "${one_mean} ± ${one_stddev}"
+				echo -n "${one_mean} ± ${one_stddev}"
 			fi
 		done
 	fi
 
 	# add our metadata to the hyperfine json result
 	jq ". |= { \"name\": \"${TEST_NAME}\" } + ." < "${JSON_FILE}" > "${JSON_FILE}.new" && mv "${JSON_FILE}.new" "${JSON_FILE}"
+
+	# run with flamegraph output if requested
+	if [ "${FLAMEGRAPH}" ]; then
+		PROFILER_OUTPUT_FILE="${OUTPUT_DIR}/${TEST_FILE}-profiler.out"
+		PROFILER_ERROR_FILE="${OUTPUT_DIR}/${TEST_FILE}-profiler.err"
+
+		if [ "${VERBOSE}" = "1" ]; then
+			echo "  Profiling and creating flamegraph ..."
+		else
+			echo -n "  --  profiling..."
+		fi
+
+		RESULT=
+		{ ${TEST_PATH} --cli "${TEST_CLI}" --profile --flamegraph "${FLAMEGRAPH_FILE}" >>"${PROFILER_OUTPUT_FILE}" 2>>"${PROFILER_ERROR_FILE}" || RESULT=$?; }
+
+		if [ "${VERBOSE}" = "1" ]; then
+			indent < "${PROFILER_OUTPUT_FILE}"
+			indent < "${PROFILER_ERROR_FILE}"
+		else
+			# error code 2 indicates a non-fatal error creating
+			# the flamegraph
+			if [ "${RESULT}" = "" -o "${RESULT}" = "0" ]; then
+				echo " done."
+			elif [ "${RESULT}" = "2" ]; then
+				echo " missing resources."
+			elif [ "${RESULT}" = "3" ]; then
+				echo " sample too small."
+
+				indent < "${PROFILER_ERROR_FILE}"
+			elif [ "${RESULT}" = "4" ]; then
+				echo " unavailable."
+			else
+				echo " failed."
+
+				indent < "${PROFILER_ERROR_FILE}"
+				ANY_FAILED=1
+			fi
+		fi
+	fi
 done
 
 TIME_END=$(time_in_ms)
@@ -263,8 +336,8 @@ if [ "${JSON_RESULT}" != "" ]; then
 
 	SYSTEM_JSON="{ \"os\": \"${SYSTEM_OS}\",  \"kernel\": \"${SYSTEM_KERNEL}\" }"
 	TIME_JSON="{ \"start\": ${TIME_START}, \"end\": ${TIME_END} }"
-	TEST_CLI_JSON="{ \"name\": \"${TEST_CLI_NAME}\", \"path\": \"$(escape "${TEST_CLI_PATH}")\", \"version\": \"${TEST_CLI_VERSION}\" }"
-	BASELINE_CLI_JSON="{ \"name\": \"${BASELINE_CLI_NAME}\", \"path\": \"$(escape "${BASELINE_CLI_PATH}")\", \"version\": \"${BASELINE_CLI_VERSION}\" }"
+	TEST_CLI_JSON="{ \"name\": \"${TEST_CLI_NAME}\", \"path\": \"$(escape "${TEST_CLI_PATH}")\", \"version\": \"${TEST_CLI_VERSION}\", \"commit\": \"${TEST_CLI_COMMIT}\" }"
+	BASELINE_CLI_JSON="{ \"name\": \"${BASELINE_CLI_NAME}\", \"path\": \"$(escape "${BASELINE_CLI_PATH}")\", \"version\": \"${BASELINE_CLI_VERSION}\", \"commit\": \"${BASELINE_CLI_COMMIT}\" }"
 
 	if [ "${BASELINE_CLI}" != "" ]; then
 		EXECUTOR_JSON="{ \"baseline\": ${BASELINE_CLI_JSON}, \"cli\": ${TEST_CLI_JSON} }"
@@ -290,6 +363,7 @@ if [ "$CLEANUP_DIR" = "1" ]; then
 	rm -f "${OUTPUT_DIR}"/*.out
 	rm -f "${OUTPUT_DIR}"/*.err
 	rm -f "${OUTPUT_DIR}"/*.json
+	rm -f "${OUTPUT_DIR}"/*.svg
 	rmdir "${OUTPUT_DIR}"
 fi
 

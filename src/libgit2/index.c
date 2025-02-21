@@ -17,10 +17,10 @@
 #include "pathspec.h"
 #include "ignore.h"
 #include "blob.h"
-#include "idxmap.h"
 #include "diff.h"
 #include "varint.h"
 #include "path.h"
+#include "index_map.h"
 
 #include "git2/odb.h"
 #include "git2/oid.h"
@@ -132,30 +132,6 @@ static int write_index(unsigned char checksum[GIT_HASH_MAX_SIZE], size_t *checks
 
 static void index_entry_free(git_index_entry *entry);
 static void index_entry_reuc_free(git_index_reuc_entry *reuc);
-
-GIT_INLINE(int) index_map_set(git_idxmap *map, git_index_entry *e, bool ignore_case)
-{
-	if (ignore_case)
-		return git_idxmap_icase_set((git_idxmap_icase *) map, e, e);
-	else
-		return git_idxmap_set(map, e, e);
-}
-
-GIT_INLINE(int) index_map_delete(git_idxmap *map, git_index_entry *e, bool ignore_case)
-{
-	if (ignore_case)
-		return git_idxmap_icase_delete((git_idxmap_icase *) map, e);
-	else
-		return git_idxmap_delete(map, e);
-}
-
-GIT_INLINE(int) index_map_resize(git_idxmap *map, size_t count, bool ignore_case)
-{
-	if (ignore_case)
-		return git_idxmap_icase_resize((git_idxmap_icase *) map, count);
-	else
-		return git_idxmap_resize(map, count);
-}
 
 int git_index_entry_srch(const void *key, const void *array_member)
 {
@@ -388,6 +364,7 @@ GIT_INLINE(int) index_find(
 void git_index__set_ignore_case(git_index *index, bool ignore_case)
 {
 	index->ignore_case = ignore_case;
+	index->entries_map.ignore_case = ignore_case;
 
 	if (ignore_case) {
 		index->entries_cmp_path    = git__strcasecmp_cb;
@@ -409,20 +386,25 @@ void git_index__set_ignore_case(git_index *index, bool ignore_case)
 	git_vector_sort(&index->reuc);
 }
 
-int git_index__open(
+int git_index_open_ext(
 	git_index **index_out,
 	const char *index_path,
-	git_oid_t oid_type)
+	const git_index_options *opts)
 {
 	git_index *index;
 	int error = -1;
 
 	GIT_ASSERT_ARG(index_out);
+	GIT_ERROR_CHECK_VERSION(opts, GIT_INDEX_OPTIONS_VERSION, "git_index_options");
+
+	if (opts && opts->oid_type)
+		GIT_ASSERT_ARG(git_oid_type_is_valid(opts->oid_type));
 
 	index = git__calloc(1, sizeof(git_index));
 	GIT_ERROR_CHECK_ALLOC(index);
 
-	index->oid_type = oid_type;
+	index->oid_type = opts && opts->oid_type ?  opts->oid_type :
+		GIT_OID_DEFAULT;
 
 	if (git_pool_init(&index->tree_pool, 1) < 0)
 		goto fail;
@@ -438,7 +420,6 @@ int git_index__open(
 	}
 
 	if (git_vector_init(&index->entries, 32, git_index_entry_cmp) < 0 ||
-	    git_idxmap_new(&index->entries_map) < 0 ||
 	    git_vector_init(&index->names, 8, conflict_name_cmp) < 0 ||
 	    git_vector_init(&index->reuc, 8, reuc_cmp) < 0 ||
 	    git_vector_init(&index->deleted, 8, git_index_entry_cmp) < 0)
@@ -464,34 +445,20 @@ fail:
 	return error;
 }
 
-#ifdef GIT_EXPERIMENTAL_SHA256
-int git_index_open(git_index **index_out, const char *index_path, git_oid_t oid_type)
-{
-	return git_index__open(index_out, index_path, oid_type);
-}
-#else
 int git_index_open(git_index **index_out, const char *index_path)
 {
-	return git_index__open(index_out, index_path, GIT_OID_SHA1);
-}
-#endif
-
-int git_index__new(git_index **out, git_oid_t oid_type)
-{
-	return git_index__open(out, NULL, oid_type);
+	return git_index_open_ext(index_out, index_path, NULL);
 }
 
-#ifdef GIT_EXPERIMENTAL_SHA256
-int git_index_new(git_index **out, git_oid_t oid_type)
-{
-	return git_index__new(out, oid_type);
-}
-#else
 int git_index_new(git_index **out)
 {
-	return git_index__new(out, GIT_OID_SHA1);
+	return git_index_open_ext(out, NULL, NULL);
 }
-#endif
+
+int git_index_new_ext(git_index **out, const git_index_options *opts)
+{
+	return git_index_open_ext(out, NULL, opts);
+}
 
 static void index_free(git_index *index)
 {
@@ -502,11 +469,11 @@ static void index_free(git_index *index)
 		return;
 
 	git_index_clear(index);
-	git_idxmap_free(index->entries_map);
-	git_vector_free(&index->entries);
-	git_vector_free(&index->names);
-	git_vector_free(&index->reuc);
-	git_vector_free(&index->deleted);
+	git_index_entrymap_dispose(&index->entries_map);
+	git_vector_dispose(&index->entries);
+	git_vector_dispose(&index->names);
+	git_vector_dispose(&index->reuc);
+	git_vector_dispose(&index->deleted);
 
 	git__free(index->index_file_path);
 
@@ -547,7 +514,7 @@ static int index_remove_entry(git_index *index, size_t pos)
 
 	if (entry != NULL) {
 		git_tree_cache_invalidate_path(index->tree, entry->path);
-		index_map_delete(index->entries_map, entry, index->ignore_case);
+		git_index_entrymap_remove(&index->entries_map, entry);
 	}
 
 	error = git_vector_remove(&index->entries, pos);
@@ -575,7 +542,8 @@ int git_index_clear(git_index *index)
 	index->tree = NULL;
 	git_pool_clear(&index->tree_pool);
 
-	git_idxmap_clear(index->entries_map);
+	git_index_entrymap_clear(&index->entries_map);
+
 	while (!error && index->entries.length > 0)
 		error = index_remove_entry(index, index->entries.length - 1);
 
@@ -786,8 +754,10 @@ static int truncate_racily_clean(git_index *index)
 	diff_opts.pathspec.count = paths.length;
 	diff_opts.pathspec.strings = (char **)paths.contents;
 
-	if ((error = git_diff_index_to_workdir(&diff, INDEX_OWNER(index), index, &diff_opts)) < 0)
+	if ((error = git_diff_index_to_workdir(&diff, INDEX_OWNER(index), index, &diff_opts)) < 0) {
+		git_vector_dispose(&paths);
 		return error;
+	}
 
 	git_vector_foreach(&diff->deltas, i, delta) {
 		entry = (git_index_entry *)git_index_get_bypath(index, delta->old_file.path, 0);
@@ -803,7 +773,7 @@ static int truncate_racily_clean(git_index *index)
 
 done:
 	git_diff_free(diff);
-	git_vector_free(&paths);
+	git_vector_dispose(&paths);
 	return 0;
 }
 
@@ -904,14 +874,9 @@ const git_index_entry *git_index_get_bypath(
 	key.path = path;
 	GIT_INDEX_ENTRY_STAGE_SET(&key, stage);
 
-	if (index->ignore_case)
-		value = git_idxmap_icase_get((git_idxmap_icase *) index->entries_map, &key);
-	else
-		value = git_idxmap_get(index->entries_map, &key);
-
-	if (!value) {
-	    git_error_set(GIT_ERROR_INDEX, "index does not contain '%s'", path);
-	    return NULL;
+	if (git_index_entrymap_get(&value, &index->entries_map, &key) != 0) {
+		git_error_set(GIT_ERROR_INDEX, "index does not contain '%s'", path);
+		return NULL;
 	}
 
 	return value;
@@ -922,7 +887,7 @@ void git_index_entry__init_from_stat(
 {
 	entry->ctime.seconds = (int32_t)st->st_ctime;
 	entry->mtime.seconds = (int32_t)st->st_mtime;
-#if defined(GIT_USE_NSEC)
+#if defined(GIT_NSEC)
 	entry->mtime.nanoseconds = st->st_mtime_nsec;
 	entry->ctime.nanoseconds = st->st_ctime_nsec;
 #endif
@@ -1185,10 +1150,13 @@ static int has_dir_name(git_index *index,
 		size_t len, pos;
 
 		for (;;) {
-			if (*--slash == '/')
-				break;
+			slash--;
+
 			if (slash <= entry->path)
 				return 0;
+
+			if (*slash == '/')
+				break;
 		}
 		len = slash - name;
 
@@ -1450,7 +1418,7 @@ static int index_insert(
 		 * check for dups, this is actually cheaper in the long run.)
 		 */
 		if ((error = git_vector_insert_sorted(&index->entries, entry, index_no_dups)) < 0 ||
-		    (error = index_map_set(index->entries_map, entry, index->ignore_case)) < 0)
+		    (error = git_index_entrymap_put(&index->entries_map, entry)) < 0)
 			goto out;
 	}
 
@@ -1679,8 +1647,7 @@ int git_index__fill(git_index *index, const git_vector *source_entries)
 		return 0;
 
 	if (git_vector_size_hint(&index->entries, source_entries->length) < 0 ||
-	    index_map_resize(index->entries_map, (size_t)(source_entries->length * 1.3),
-			     index->ignore_case) < 0)
+	    git_index_entrymap_resize(&index->entries_map, (size_t)(source_entries->length * 1.3)) < 0)
 		return -1;
 
 	git_vector_foreach(source_entries, i, source_entry) {
@@ -1693,10 +1660,8 @@ int git_index__fill(git_index *index, const git_vector *source_entries)
 		entry->flags_extended |= GIT_INDEX_ENTRY_UPTODATE;
 		entry->mode = git_index__create_mode(entry->mode);
 
-		if ((error = git_vector_insert(&index->entries, entry)) < 0)
-			break;
-
-		if ((error = index_map_set(index->entries_map, entry, index->ignore_case)) < 0)
+		if ((error = git_vector_insert(&index->entries, entry)) < 0 ||
+		    (error = git_index_entrymap_put(&index->entries_map, entry)) < 0)
 			break;
 
 		index->dirty = 1;
@@ -1739,7 +1704,7 @@ int git_index_remove(git_index *index, const char *path, int stage)
 	remove_key.path = path;
 	GIT_INDEX_ENTRY_STAGE_SET(&remove_key, stage);
 
-	index_map_delete(index->entries_map, &remove_key, index->ignore_case);
+	git_index_entrymap_remove(&index->entries_map, &remove_key);
 
 	if (index_find(&position, index, path, 0, stage) < 0) {
 		git_error_set(
@@ -2399,7 +2364,7 @@ static int read_reuc(git_index *index, const char *buffer, size_t size)
 				return index_error_invalid("reading reuc entry oid");
 			}
 
-			if (git_oid__fromraw(&lost->oid[i], (const unsigned char *) buffer, index->oid_type) < 0)
+			if (git_oid_from_raw(&lost->oid[i], (const unsigned char *) buffer, index->oid_type) < 0)
 				return -1;
 
 			size -= oid_size;
@@ -2588,14 +2553,14 @@ static int read_entry(
 
 	switch (index->oid_type) {
 	case GIT_OID_SHA1:
-		if (git_oid__fromraw(&entry.id, source_sha1.oid,
+		if (git_oid_from_raw(&entry.id, source_sha1.oid,
 		                     GIT_OID_SHA1) < 0)
 			return -1;
 		entry.flags = ntohs(source_sha1.flags);
 		break;
 #ifdef GIT_EXPERIMENTAL_SHA256
 	case GIT_OID_SHA256:
-		if (git_oid__fromraw(&entry.id, source_sha256.oid,
+		if (git_oid_from_raw(&entry.id, source_sha256.oid,
 		                     GIT_OID_SHA256) < 0)
 			return -1;
 		entry.flags = ntohs(source_sha256.flags);
@@ -2757,6 +2722,7 @@ static int parse_index(git_index *index, const char *buffer, size_t buffer_size)
 	unsigned int i;
 	struct index_header header = { 0 };
 	unsigned char checksum[GIT_HASH_MAX_SIZE];
+	unsigned char zero_checksum[GIT_HASH_MAX_SIZE] = { 0 };
 	size_t checksum_size = git_hash_size(git_oid_algorithm(index->oid_type));
 	const char *last = NULL;
 	const char *empty = "";
@@ -2791,7 +2757,7 @@ static int parse_index(git_index *index, const char *buffer, size_t buffer_size)
 
 	GIT_ASSERT(!index->entries.length);
 
-	if ((error = index_map_resize(index->entries_map, header.entry_count, index->ignore_case)) < 0)
+	if ((error = git_index_entrymap_resize(&index->entries_map, header.entry_count)) < 0)
 		return error;
 
 	/* Parse all the entries */
@@ -2809,7 +2775,7 @@ static int parse_index(git_index *index, const char *buffer, size_t buffer_size)
 			goto done;
 		}
 
-		if ((error = index_map_set(index->entries_map, entry, index->ignore_case)) < 0) {
+		if ((error = git_index_entrymap_put(&index->entries_map, entry)) < 0) {
 			index_entry_free(entry);
 			goto done;
 		}
@@ -2846,8 +2812,11 @@ static int parse_index(git_index *index, const char *buffer, size_t buffer_size)
 	/*
 	 * SHA-1 or SHA-256 (depending on the repository's object format)
 	 * over the content of the index file before this checksum.
+	 * Note: checksum may be 0 if the index was written by a client
+	 * where index.skipHash was set to true.
 	 */
-	if (memcmp(checksum, buffer, checksum_size) != 0) {
+	if (memcmp(zero_checksum, buffer, checksum_size) != 0 &&
+	    memcmp(checksum, buffer, checksum_size) != 0) {
 		error = index_error_invalid(
 			"calculated checksum does not match expected");
 		goto done;
@@ -3082,7 +3051,7 @@ static int write_entries(git_index *index, git_filebuf *file)
 	}
 
 done:
-	git_vector_free(&case_sorted);
+	git_vector_dispose(&case_sorted);
 	return error;
 }
 
@@ -3358,13 +3327,10 @@ int git_index_read_tree(git_index *index, const git_tree *tree)
 {
 	int error = 0;
 	git_vector entries = GIT_VECTOR_INIT;
-	git_idxmap *entries_map;
+	git_index_entrymap entries_map = GIT_INDEX_ENTRYMAP_INIT;
 	read_tree_data data;
 	size_t i;
 	git_index_entry *e;
-
-	if (git_idxmap_new(&entries_map) < 0)
-		return -1;
 
 	git_vector_set_cmp(&entries, index->entries._cmp); /* match sort */
 
@@ -3381,11 +3347,11 @@ int git_index_read_tree(git_index *index, const git_tree *tree)
 	if ((error = git_tree_walk(tree, GIT_TREEWALK_POST, read_tree_cb, &data)) < 0)
 		goto cleanup;
 
-	if ((error = index_map_resize(entries_map, entries.length, index->ignore_case)) < 0)
+	if ((error = git_index_entrymap_resize(&entries_map, entries.length)) < 0)
 		goto cleanup;
 
 	git_vector_foreach(&entries, i, e) {
-		if ((error = index_map_set(entries_map, e, index->ignore_case)) < 0) {
+		if ((error = git_index_entrymap_put(&entries_map, e)) < 0) {
 			git_error_set(GIT_ERROR_INDEX, "failed to insert entry into map");
 			return error;
 		}
@@ -3395,18 +3361,18 @@ int git_index_read_tree(git_index *index, const git_tree *tree)
 
 	git_vector_sort(&entries);
 
-	if ((error = git_index_clear(index)) < 0) {
-		/* well, this isn't good */;
-	} else {
-		git_vector_swap(&entries, &index->entries);
-		entries_map = git_atomic_swap(index->entries_map, entries_map);
-	}
+	if ((error = git_index_clear(index)) < 0)
+		goto cleanup;
+
+	git_vector_swap(&entries, &index->entries);
+	git_index_entrymap_swap(&entries_map, &index->entries_map);
 
 	index->dirty = 1;
 
 cleanup:
-	git_vector_free(&entries);
-	git_idxmap_free(entries_map);
+	git_vector_dispose(&entries);
+	git_index_entrymap_dispose(&entries_map);
+
 	if (error < 0)
 		return error;
 
@@ -3422,7 +3388,7 @@ static int git_index_read_iterator(
 {
 	git_vector new_entries = GIT_VECTOR_INIT,
 		remove_entries = GIT_VECTOR_INIT;
-	git_idxmap *new_entries_map = NULL;
+	git_index_entrymap new_entries_map = GIT_INDEX_ENTRYMAP_INIT;
 	git_iterator *index_iterator = NULL;
 	git_iterator_options opts = GIT_ITERATOR_OPTIONS_INIT;
 	const git_index_entry *old_entry, *new_entry;
@@ -3433,12 +3399,11 @@ static int git_index_read_iterator(
 	GIT_ASSERT((new_iterator->flags & GIT_ITERATOR_DONT_IGNORE_CASE));
 
 	if ((error = git_vector_init(&new_entries, new_length_hint, index->entries._cmp)) < 0 ||
-	    (error = git_vector_init(&remove_entries, index->entries.length, NULL)) < 0 ||
-	    (error = git_idxmap_new(&new_entries_map)) < 0)
+	    (error = git_vector_init(&remove_entries, index->entries.length, NULL)) < 0)
 		goto done;
 
-	if (new_length_hint && (error = index_map_resize(new_entries_map, new_length_hint,
-							 index->ignore_case)) < 0)
+	if (new_length_hint &&
+	    (error = git_index_entrymap_resize(&new_entries_map, new_length_hint)) < 0)
 		goto done;
 
 	opts.flags = GIT_ITERATOR_DONT_IGNORE_CASE |
@@ -3503,8 +3468,7 @@ static int git_index_read_iterator(
 
 		if (add_entry) {
 			if ((error = git_vector_insert(&new_entries, add_entry)) == 0)
-				error = index_map_set(new_entries_map, add_entry,
-						      index->ignore_case);
+				error = git_index_entrymap_put(&new_entries_map, add_entry);
 		}
 
 		if (remove_entry && error >= 0)
@@ -3533,7 +3497,7 @@ static int git_index_read_iterator(
 	    goto done;
 
 	git_vector_swap(&new_entries, &index->entries);
-	new_entries_map = git_atomic_swap(index->entries_map, new_entries_map);
+	git_index_entrymap_swap(&index->entries_map, &new_entries_map);
 
 	git_vector_foreach(&remove_entries, i, entry) {
 		if (index->tree)
@@ -3548,9 +3512,9 @@ static int git_index_read_iterator(
 	error = 0;
 
 done:
-	git_idxmap_free(new_entries_map);
-	git_vector_free(&new_entries);
-	git_vector_free(&remove_entries);
+	git_index_entrymap_dispose(&new_entries_map);
+	git_vector_dispose(&new_entries);
+	git_vector_dispose(&remove_entries);
 	git_iterator_free(index_iterator);
 	return error;
 }
@@ -3851,7 +3815,7 @@ int git_index_snapshot_new(git_vector *snap, git_index *index)
 
 void git_index_snapshot_release(git_vector *snap, git_index *index)
 {
-	git_vector_free(snap);
+	git_vector_dispose(snap);
 
 	git_atomic32_dec(&index->readers);
 

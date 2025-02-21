@@ -2,6 +2,7 @@
 #include "path.h"
 #include "posix.h"
 #include "git2/sys/repository.h"
+#include "repository.h"
 
 static git_repository *repo;
 static git_str file_path_buf = GIT_STR_INIT;
@@ -61,7 +62,7 @@ void test_network_remote_local__retrieve_advertised_references(void)
 
 	cl_git_pass(git_remote_ls(&refs, &refs_len, remote));
 
-	cl_assert_equal_i(refs_len, 30);
+	cl_assert_equal_i(refs_len, 31);
 }
 
 void test_network_remote_local__retrieve_advertised_before_connect(void)
@@ -85,7 +86,7 @@ void test_network_remote_local__retrieve_advertised_references_after_disconnect(
 
 	cl_git_pass(git_remote_ls(&refs, &refs_len, remote));
 
-	cl_assert_equal_i(refs_len, 30);
+	cl_assert_equal_i(refs_len, 31);
 }
 
 void test_network_remote_local__retrieve_advertised_references_from_spaced_repository(void)
@@ -100,7 +101,7 @@ void test_network_remote_local__retrieve_advertised_references_from_spaced_repos
 
 	cl_git_pass(git_remote_ls(&refs, &refs_len, remote));
 
-	cl_assert_equal_i(refs_len, 30);
+	cl_assert_equal_i(refs_len, 31);
 
 	git_remote_free(remote);	/* Disconnect from the "spaced repo" before the cleanup */
 	remote = NULL;
@@ -470,10 +471,11 @@ void test_network_remote_local__anonymous_remote_inmemory_repo(void)
 {
 	git_repository *inmemory;
 	git_remote *remote;
+	git_repository_new_options repo_opts = GIT_REPOSITORY_NEW_OPTIONS_INIT;
 
 	git_str_sets(&file_path_buf, cl_git_path_url(cl_fixture("testrepo.git")));
 
-	cl_git_pass(git_repository_new(&inmemory));
+	cl_git_pass(git_repository_new_ext(&inmemory, &repo_opts));
 	cl_git_pass(git_remote_create_anonymous(&remote, inmemory, git_str_cstr(&file_path_buf)));
 	cl_git_pass(git_remote_connect(remote, GIT_DIRECTION_FETCH, NULL, NULL, NULL));
 	cl_assert(git_remote_connected(remote));

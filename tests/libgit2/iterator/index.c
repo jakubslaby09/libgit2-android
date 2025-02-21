@@ -52,7 +52,7 @@ static void index_iterator_test(
 
 		if (expected_oids != NULL) {
 			git_oid oid;
-			cl_git_pass(git_oid__fromstr(&oid, expected_oids[count], GIT_OID_SHA1));
+			cl_git_pass(git_oid_from_string(&oid, expected_oids[count], GIT_OID_SHA1));
 			cl_assert_equal_oid(&oid, &entry->id);
 		}
 
@@ -627,7 +627,7 @@ void test_iterator_index__pathlist(void)
 	}
 
 	git_index_free(index);
-	git_vector_free(&filelist);
+	git_vector_dispose(&filelist);
 }
 
 void test_iterator_index__pathlist_with_dirs(void)
@@ -728,7 +728,7 @@ void test_iterator_index__pathlist_with_dirs(void)
 	}
 
 	git_index_free(index);
-	git_vector_free(&filelist);
+	git_vector_dispose(&filelist);
 }
 
 void test_iterator_index__pathlist_with_dirs_include_trees(void)
@@ -759,7 +759,7 @@ void test_iterator_index__pathlist_with_dirs_include_trees(void)
 	git_iterator_free(i);
 
 	git_index_free(index);
-	git_vector_free(&filelist);
+	git_vector_dispose(&filelist);
 }
 
 void test_iterator_index__pathlist_1(void)
@@ -799,7 +799,7 @@ void test_iterator_index__pathlist_1(void)
 	git_iterator_free(i);
 
 	git_index_free(index);
-	git_vector_free(&filelist);
+	git_vector_dispose(&filelist);
 }
 
 void test_iterator_index__pathlist_2(void)
@@ -841,7 +841,7 @@ void test_iterator_index__pathlist_2(void)
 	git_iterator_free(i);
 
 	git_index_free(index);
-	git_vector_free(&filelist);
+	git_vector_dispose(&filelist);
 }
 
 void test_iterator_index__pathlist_four(void)
@@ -883,7 +883,7 @@ void test_iterator_index__pathlist_four(void)
 	git_iterator_free(i);
 
 	git_index_free(index);
-	git_vector_free(&filelist);
+	git_vector_dispose(&filelist);
 }
 
 void test_iterator_index__pathlist_icase(void)
@@ -946,7 +946,7 @@ void test_iterator_index__pathlist_icase(void)
 
 	cl_git_pass(git_index_set_caps(index, caps));
 	git_index_free(index);
-	git_vector_free(&filelist);
+	git_vector_dispose(&filelist);
 }
 
 void test_iterator_index__pathlist_with_directory(void)
@@ -973,7 +973,7 @@ void test_iterator_index__pathlist_with_directory(void)
 
 	git_index_free(index);
 	git_tree_free(tree);
-	git_vector_free(&filelist);
+	git_vector_dispose(&filelist);
 }
 
 static void create_paths(git_index *index, const char *root, int depth)
@@ -999,7 +999,7 @@ static void create_paths(git_index *index, const char *root, int depth)
 			memset(&entry, 0, sizeof(git_index_entry));
 			entry.path = fullpath.ptr;
 			entry.mode = GIT_FILEMODE_BLOB;
-			git_oid__fromstr(&entry.id, "d44e18fb93b7107b5cd1b95d601591d77869a1b6", GIT_OID_SHA1);
+			git_oid_from_string(&entry.id, "d44e18fb93b7107b5cd1b95d601591d77869a1b6", GIT_OID_SHA1);
 
 			cl_git_pass(git_index_add(index, &entry));
 		} else if (depth > 0) {
@@ -1131,7 +1131,7 @@ void test_iterator_index__pathlist_for_deeply_nested_item(void)
 	}
 
 	git_index_free(index);
-	git_vector_free(&filelist);
+	git_vector_dispose(&filelist);
 }
 
 void test_iterator_index__advance_over(void)
@@ -1296,17 +1296,17 @@ static void add_conflict(
 
 	ancestor.path = ancestor_path;
 	ancestor.mode = GIT_FILEMODE_BLOB;
-	git_oid__fromstr(&ancestor.id, "d44e18fb93b7107b5cd1b95d601591d77869a1b6", GIT_OID_SHA1);
+	git_oid_from_string(&ancestor.id, "d44e18fb93b7107b5cd1b95d601591d77869a1b6", GIT_OID_SHA1);
 	GIT_INDEX_ENTRY_STAGE_SET(&ancestor, 1);
 
 	ours.path = our_path;
 	ours.mode = GIT_FILEMODE_BLOB;
-	git_oid__fromstr(&ours.id, "d44e18fb93b7107b5cd1b95d601591d77869a1b6", GIT_OID_SHA1);
+	git_oid_from_string(&ours.id, "d44e18fb93b7107b5cd1b95d601591d77869a1b6", GIT_OID_SHA1);
 	GIT_INDEX_ENTRY_STAGE_SET(&ours, 2);
 
 	theirs.path = their_path;
 	theirs.mode = GIT_FILEMODE_BLOB;
-	git_oid__fromstr(&theirs.id, "d44e18fb93b7107b5cd1b95d601591d77869a1b6", GIT_OID_SHA1);
+	git_oid_from_string(&theirs.id, "d44e18fb93b7107b5cd1b95d601591d77869a1b6", GIT_OID_SHA1);
 	GIT_INDEX_ENTRY_STAGE_SET(&theirs, 3);
 
 	cl_git_pass(git_index_conflict_add(index, &ancestor, &ours, &theirs));

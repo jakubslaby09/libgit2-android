@@ -190,7 +190,7 @@ static void set_up_workingdir(const char *name)
 			continue;
 		p_unlink(fn);
 	}
-	git_vector_free_deep(&contents);
+	git_vector_dispose_deep(&contents);
 
 	/* copy input files */
 	git_fs_path_dirload(&contents, cl_fixture("crlf"), 0, 0);
@@ -207,7 +207,7 @@ static void set_up_workingdir(const char *name)
 		git__free(basename);
 		git_str_dispose(&dest_filename);
 	}
-	git_vector_free_deep(&contents);
+	git_vector_dispose_deep(&contents);
 }
 
 void test_index_crlf__matches_core_git(void)
@@ -243,7 +243,7 @@ void test_index_crlf__autocrlf_false_no_attrs(void)
 	cl_git_pass(git_index_add_bypath(g_index, "newfile.txt"));
 	entry = git_index_get_bypath(g_index, "newfile.txt", 0);
 
-	cl_git_pass(git_oid__fromstr(&oid,
+	cl_git_pass(git_oid_from_string(&oid,
 		(GIT_EOL_NATIVE == GIT_EOL_CRLF) ? FILE_OID_CRLF : FILE_OID_LF,
 		GIT_OID_SHA1));
 	cl_assert_equal_oid(&oid, &entry->id);
@@ -262,7 +262,7 @@ void test_index_crlf__autocrlf_true_no_attrs(void)
 	cl_git_pass(git_index_add_bypath(g_index, "newfile.txt"));
 	entry = git_index_get_bypath(g_index, "newfile.txt", 0);
 
-	cl_git_pass(git_oid__fromstr(&oid, FILE_OID_LF, GIT_OID_SHA1));
+	cl_git_pass(git_oid_from_string(&oid, FILE_OID_LF, GIT_OID_SHA1));
 	cl_assert_equal_oid(&oid, &entry->id);
 }
 
@@ -279,7 +279,7 @@ void test_index_crlf__autocrlf_input_no_attrs(void)
 	cl_git_pass(git_index_add_bypath(g_index, "newfile.txt"));
 	entry = git_index_get_bypath(g_index, "newfile.txt", 0);
 
-	cl_git_pass(git_oid__fromstr(&oid, FILE_OID_LF, GIT_OID_SHA1));
+	cl_git_pass(git_oid_from_string(&oid, FILE_OID_LF, GIT_OID_SHA1));
 	cl_assert_equal_oid(&oid, &entry->id);
 }
 
@@ -298,7 +298,7 @@ void test_index_crlf__autocrlf_false_text_auto_attr(void)
 	cl_git_pass(git_index_add_bypath(g_index, "newfile.txt"));
 	entry = git_index_get_bypath(g_index, "newfile.txt", 0);
 
-	cl_git_pass(git_oid__fromstr(&oid, FILE_OID_LF, GIT_OID_SHA1));
+	cl_git_pass(git_oid_from_string(&oid, FILE_OID_LF, GIT_OID_SHA1));
 	cl_assert_equal_oid(&oid, &entry->id);
 }
 
@@ -317,7 +317,7 @@ void test_index_crlf__autocrlf_true_text_auto_attr(void)
 	cl_git_pass(git_index_add_bypath(g_index, "newfile.txt"));
 	entry = git_index_get_bypath(g_index, "newfile.txt", 0);
 
-	cl_git_pass(git_oid__fromstr(&oid, FILE_OID_LF, GIT_OID_SHA1));
+	cl_git_pass(git_oid_from_string(&oid, FILE_OID_LF, GIT_OID_SHA1));
 	cl_assert_equal_oid(&oid, &entry->id);
 }
 
@@ -336,7 +336,7 @@ void test_index_crlf__autocrlf_input_text_auto_attr(void)
 	cl_git_pass(git_index_add_bypath(g_index, "newfile.txt"));
 	entry = git_index_get_bypath(g_index, "newfile.txt", 0);
 
-	cl_git_pass(git_oid__fromstr(&oid, FILE_OID_LF, GIT_OID_SHA1));
+	cl_git_pass(git_oid_from_string(&oid, FILE_OID_LF, GIT_OID_SHA1));
 	cl_assert_equal_oid(&oid, &entry->id);
 }
 
@@ -356,7 +356,7 @@ void test_index_crlf__safecrlf_true_autocrlf_input_text_auto_attr(void)
 	entry = git_index_get_bypath(g_index, "newfile.txt", 0);
 	cl_assert(entry);
 
-	cl_git_pass(git_oid__fromstr(&oid, FILE_OID_LF, GIT_OID_SHA1));
+	cl_git_pass(git_oid_from_string(&oid, FILE_OID_LF, GIT_OID_SHA1));
 	cl_assert_equal_oid(&oid, &entry->id);
 
 	cl_git_mkfile("./crlf/newfile2.txt", FILE_CONTENTS_CRLF);
@@ -377,7 +377,7 @@ void test_index_crlf__safecrlf_true_autocrlf_input_text__no_attr(void)
 	entry = git_index_get_bypath(g_index, "newfile.txt", 0);
 	cl_assert(entry);
 
-	cl_git_pass(git_oid__fromstr(&oid, FILE_OID_LF, GIT_OID_SHA1));
+	cl_git_pass(git_oid_from_string(&oid, FILE_OID_LF, GIT_OID_SHA1));
 	cl_assert_equal_oid(&oid, &entry->id);
 
 	cl_git_mkfile("./crlf/newfile2.txt", FILE_CONTENTS_CRLF);

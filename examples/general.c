@@ -31,8 +31,8 @@
  * Git Internals that you will need to know to work with Git at this level,
  * check out [Chapter 10][pg] of the Pro Git book.
  *
- * [lg]: http://libgit2.github.com
- * [ap]: http://libgit2.github.com/libgit2
+ * [lg]: https://libgit2.org
+ * [ap]: https://libgit2.org/libgit2
  * [pg]: https://git-scm.com/book/en/v2/Git-Internals-Plumbing-and-Porcelain
  */
 
@@ -97,7 +97,7 @@ int lg2_general(git_repository *repo, int argc, char** argv)
 	 *
 	 * (Try running this program against tests/resources/testrepo.git.)
 	 *
-	 * [me]: http://libgit2.github.com/libgit2/#HEAD/group/repository
+	 * [me]: https://libgit2.org/libgit2/#HEAD/group/repository
 	 */
 	repo_path = (argc > 1) ? argv[1] : "/opt/libgit2-test/.git";
 
@@ -143,7 +143,7 @@ static void oid_parsing(git_oid *oid)
 	 * key we're working with.
 	 */
 #ifdef GIT_EXPERIMENTAL_SHA256
-	git_oid_fromstr(oid, hex, GIT_OID_SHA1);
+	git_oid_from_string(oid, hex, GIT_OID_SHA1);
 #else
 	git_oid_fromstr(oid, hex);
 #endif
@@ -173,7 +173,7 @@ static void oid_parsing(git_oid *oid)
  * working with raw objects, we'll need to get this structure from the
  * repository.
  *
- * [odb]: http://libgit2.github.com/libgit2/#HEAD/group/odb
+ * [odb]: https://libgit2.org/libgit2/#HEAD/group/odb
  */
 static void object_database(git_repository *repo, git_oid *oid)
 {
@@ -262,7 +262,7 @@ static void object_database(git_repository *repo, git_oid *oid)
  * of them here.  You can read about the other ones in the [commit API
  * docs][cd].
  *
- * [cd]: http://libgit2.github.com/libgit2/#HEAD/group/commit
+ * [cd]: https://libgit2.org/libgit2/#HEAD/group/commit
  */
 static void commit_writing(git_repository *repo)
 {
@@ -292,8 +292,8 @@ static void commit_writing(git_repository *repo)
 	 * but you can also use
 	 */
 #ifdef GIT_EXPERIMENTAL_SHA256
-	git_oid_fromstr(&tree_id, "f60079018b664e4e79329a7ef9559c8d9e0378d1", GIT_OID_SHA1);
-	git_oid_fromstr(&parent_id, "5b5b025afb0b4c913b4c338a42934a3863bf3644", GIT_OID_SHA1);
+	git_oid_from_string(&tree_id, "f60079018b664e4e79329a7ef9559c8d9e0378d1", GIT_OID_SHA1);
+	git_oid_from_string(&parent_id, "5b5b025afb0b4c913b4c338a42934a3863bf3644", GIT_OID_SHA1);
 #else
 	git_oid_fromstr(&tree_id, "f60079018b664e4e79329a7ef9559c8d9e0378d1");
 	git_oid_fromstr(&parent_id, "5b5b025afb0b4c913b4c338a42934a3863bf3644");
@@ -347,7 +347,7 @@ static void commit_writing(git_repository *repo)
  * data in the commit - the author (name, email, datetime), committer
  * (same), tree, message, encoding and parent(s).
  *
- * [pco]: http://libgit2.github.com/libgit2/#HEAD/group/commit
+ * [pco]: https://libgit2.org/libgit2/#HEAD/group/commit
  */
 static void commit_parsing(git_repository *repo)
 {
@@ -363,7 +363,7 @@ static void commit_parsing(git_repository *repo)
 	printf("\n*Commit Parsing*\n");
 
 #ifdef GIT_EXPERIMENTAL_SHA256
-	git_oid_fromstr(&oid, "8496071c1b46c854b31185ea97743be6a8774479", GIT_OID_SHA1);
+	git_oid_from_string(&oid, "8496071c1b46c854b31185ea97743be6a8774479", GIT_OID_SHA1);
 #else
 	git_oid_fromstr(&oid, "8496071c1b46c854b31185ea97743be6a8774479");
 #endif
@@ -418,7 +418,7 @@ static void commit_parsing(git_repository *repo)
  * functions very similarly to the commit lookup, parsing and creation
  * methods, since the objects themselves are very similar.
  *
- * [tm]: http://libgit2.github.com/libgit2/#HEAD/group/tag
+ * [tm]: https://libgit2.org/libgit2/#HEAD/group/tag
  */
 static void tag_parsing(git_repository *repo)
 {
@@ -436,7 +436,7 @@ static void tag_parsing(git_repository *repo)
 	 * the same way that we would a commit (or any other object).
 	 */
 #ifdef GIT_EXPERIMENTAL_SHA256
-	git_oid_fromstr(&oid, "b25fa35b38051e4ae45d4222e795f9df2e43f1d1", GIT_OID_SHA1);
+	git_oid_from_string(&oid, "b25fa35b38051e4ae45d4222e795f9df2e43f1d1", GIT_OID_SHA1);
 #else
 	git_oid_fromstr(&oid, "b25fa35b38051e4ae45d4222e795f9df2e43f1d1");
 #endif
@@ -472,7 +472,7 @@ static void tag_parsing(git_repository *repo)
  * object type in Git, but a useful structure for parsing and traversing
  * tree entries.
  *
- * [tp]: http://libgit2.github.com/libgit2/#HEAD/group/tree
+ * [tp]: https://libgit2.org/libgit2/#HEAD/group/tree
  */
 static void tree_parsing(git_repository *repo)
 {
@@ -488,7 +488,7 @@ static void tree_parsing(git_repository *repo)
 	 * Create the oid and lookup the tree object just like the other objects.
 	 */
 #ifdef GIT_EXPERIMENTAL_SHA256
-	git_oid_fromstr(&oid, "f60079018b664e4e79329a7ef9559c8d9e0378d1", GIT_OID_SHA1);
+	git_oid_from_string(&oid, "f60079018b664e4e79329a7ef9559c8d9e0378d1", GIT_OID_SHA1);
 #else
 	git_oid_fromstr(&oid, "f60079018b664e4e79329a7ef9559c8d9e0378d1");
 #endif
@@ -536,7 +536,7 @@ static void tree_parsing(git_repository *repo)
  * from disk and writing it to the db and getting the oid back so you
  * don't have to do all those steps yourself.
  *
- * [ba]: http://libgit2.github.com/libgit2/#HEAD/group/blob
+ * [ba]: https://libgit2.org/libgit2/#HEAD/group/blob
  */
 static void blob_parsing(git_repository *repo)
 {
@@ -546,7 +546,7 @@ static void blob_parsing(git_repository *repo)
 	printf("\n*Blob Parsing*\n");
 
 #ifdef GIT_EXPERIMENTAL_SHA256
-	git_oid_fromstr(&oid, "1385f264afb75a56a5bec74243be9b367ba4ca08", GIT_OID_SHA1);
+	git_oid_from_string(&oid, "1385f264afb75a56a5bec74243be9b367ba4ca08", GIT_OID_SHA1);
 #else
 	git_oid_fromstr(&oid, "1385f264afb75a56a5bec74243be9b367ba4ca08");
 #endif
@@ -578,7 +578,7 @@ static void blob_parsing(git_repository *repo)
  * that were ancestors of (reachable from) a given starting point.  This
  * can allow you to create `git log` type functionality.
  *
- * [rw]: http://libgit2.github.com/libgit2/#HEAD/group/revwalk
+ * [rw]: https://libgit2.org/libgit2/#HEAD/group/revwalk
  */
 static void revwalking(git_repository *repo)
 {
@@ -592,7 +592,7 @@ static void revwalking(git_repository *repo)
 	printf("\n*Revwalking*\n");
 
 #ifdef GIT_EXPERIMENTAL_SHA256
-	git_oid_fromstr(&oid, "5b5b025afb0b4c913b4c338a42934a3863bf3644", GIT_OID_SHA1);
+	git_oid_from_string(&oid, "5b5b025afb0b4c913b4c338a42934a3863bf3644", GIT_OID_SHA1);
 #else
 	git_oid_fromstr(&oid, "5b5b025afb0b4c913b4c338a42934a3863bf3644");
 #endif
@@ -643,7 +643,7 @@ static void revwalking(git_repository *repo)
  * The [index file API][gi] allows you to read, traverse, update and write
  * the Git index file (sometimes thought of as the staging area).
  *
- * [gi]: http://libgit2.github.com/libgit2/#HEAD/group/index
+ * [gi]: https://libgit2.org/libgit2/#HEAD/group/index
  */
 static void index_walking(git_repository *repo)
 {
@@ -687,7 +687,7 @@ static void index_walking(git_repository *repo)
  * references such as branches, tags and remote references (everything in
  * the .git/refs directory).
  *
- * [ref]: http://libgit2.github.com/libgit2/#HEAD/group/reference
+ * [ref]: https://libgit2.org/libgit2/#HEAD/group/reference
  */
 static void reference_listing(git_repository *repo)
 {
@@ -740,7 +740,7 @@ static void reference_listing(git_repository *repo)
  * The [config API][config] allows you to list and update config values
  * in any of the accessible config file locations (system, global, local).
  *
- * [config]: http://libgit2.github.com/libgit2/#HEAD/group/config
+ * [config]: https://libgit2.org/libgit2/#HEAD/group/config
  */
 static void config_files(const char *repo_path, git_repository* repo)
 {

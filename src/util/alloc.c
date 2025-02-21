@@ -8,8 +8,9 @@
 #include "alloc.h"
 #include "runtime.h"
 
-#include "allocators/failalloc.h"
 #include "allocators/stdalloc.h"
+#include "allocators/debugalloc.h"
+#include "allocators/failalloc.h"
 #include "allocators/win32_leakcheck.h"
 
 /* Fail any allocation until git_libgit2_init is called. */
@@ -86,8 +87,10 @@ char *git__substrdup(const char *str, size_t n)
 
 static int setup_default_allocator(void)
 {
-#if defined(GIT_WIN32_LEAKCHECK)
+#if defined(GIT_DEBUG_LEAKCHECK_WIN32)
 	return git_win32_leakcheck_init_allocator(&git__allocator);
+#elif defined(GIT_DEBUG_STRICT_ALLOC)
+	return git_debugalloc_init_allocator(&git__allocator);
 #else
 	return git_stdalloc_init_allocator(&git__allocator);
 #endif

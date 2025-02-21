@@ -675,7 +675,7 @@ void test_iterator_tree__case_conflicts_0(void)
 
 	g_repo = cl_git_sandbox_init("icase");
 
-	cl_git_pass(git_oid__fromstr(&blob_id, blob_sha, GIT_OID_SHA1)); /* lookup blob */
+	cl_git_pass(git_oid_from_string(&blob_id, blob_sha, GIT_OID_SHA1)); /* lookup blob */
 
 	/* create tree with: A/1.file, A/3.file, a/2.file, a/4.file */
 	build_test_tree(
@@ -729,7 +729,7 @@ void test_iterator_tree__case_conflicts_1(void)
 
 	g_repo = cl_git_sandbox_init("icase");
 
-	cl_git_pass(git_oid__fromstr(&blob_id, blob_sha, GIT_OID_SHA1)); /* lookup blob */
+	cl_git_pass(git_oid_from_string(&blob_id, blob_sha, GIT_OID_SHA1)); /* lookup blob */
 
 	/* create: A/a A/b/1 A/c a/a a/b a/C */
 	build_test_tree(&Ab_id, g_repo, "b|1|", &blob_id);
@@ -798,7 +798,7 @@ void test_iterator_tree__case_conflicts_2(void)
 
 	g_repo = cl_git_sandbox_init("icase");
 
-	cl_git_pass(git_oid__fromstr(&blob_id, blob_sha, GIT_OID_SHA1)); /* lookup blob */
+	cl_git_pass(git_oid_from_string(&blob_id, blob_sha, GIT_OID_SHA1)); /* lookup blob */
 
 	build_test_tree(&d1, g_repo, "b|16|,b|foo|", &blob_id, &blob_id);
 	build_test_tree(&d2, g_repo, "b|15|,b|FOO|", &blob_id, &blob_id);
@@ -911,7 +911,7 @@ void test_iterator_tree__pathlist(void)
 	expect_iterator_items(i, expect, NULL, expect, NULL);
 	git_iterator_free(i);
 
-	git_vector_free(&filelist);
+	git_vector_dispose(&filelist);
 	git_tree_free(tree);
 }
 
@@ -968,7 +968,7 @@ void test_iterator_tree__pathlist_icase(void)
 	expect_iterator_items(i, 2, NULL, 2, NULL);
 	git_iterator_free(i);
 
-	git_vector_free(&filelist);
+	git_vector_dispose(&filelist);
 	git_tree_free(tree);
 }
 
@@ -1021,7 +1021,7 @@ void test_iterator_tree__pathlist_with_directory(void)
 	git_iterator_free(i);
 
 	git_tree_free(tree);
-	git_vector_free(&filelist);
+	git_vector_dispose(&filelist);
 }
 
 void test_iterator_tree__pathlist_with_directory_include_tree_nodes(void)
@@ -1050,7 +1050,7 @@ void test_iterator_tree__pathlist_with_directory_include_tree_nodes(void)
 	git_iterator_free(i);
 
 	git_tree_free(tree);
-	git_vector_free(&filelist);
+	git_vector_dispose(&filelist);
 }
 
 void test_iterator_tree__pathlist_no_match(void)
@@ -1075,6 +1075,6 @@ void test_iterator_tree__pathlist_no_match(void)
 	git_iterator_free(i);
 
 	git_tree_free(tree);
-	git_vector_free(&filelist);
+	git_vector_dispose(&filelist);
 }
 

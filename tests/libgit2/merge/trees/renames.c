@@ -286,7 +286,7 @@ void test_merge_trees_renames__cache_recomputation(void)
 	void *data;
 	size_t i;
 
-	cl_git_pass(git_oid__fromstr(&blob, "a2d8d1824c68541cca94ffb90f79291eba495921", GIT_OID_SHA1));
+	cl_git_pass(git_oid_from_string(&blob, "a2d8d1824c68541cca94ffb90f79291eba495921", GIT_OID_SHA1));
 
 	/*
 	 * Create a 50MB blob that consists of NUL bytes only. It is important
@@ -349,4 +349,23 @@ void test_merge_trees_renames__cache_recomputation(void)
 	git_tree_free(their_tree);
 	git_tree_free(our_tree);
 	git__free(data);
+}
+
+void test_merge_trees_renames__emptyfile_renames(void)
+{
+	git_index *index;
+	git_merge_options *opts = NULL;
+
+	struct merge_index_entry merge_index_entries[] = {
+		{ 0100644, "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391", 1, "bar" },
+		{ 0100644, "60b12be2d2f57977ce83d8dfd32e2394ac1ba1a2", 3, "bar" },
+		{ 0100644, "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391", 0, "boo" },
+		{ 0100644, "e50a49f9558d09d4d3bfc108363bb24c127ed263", 0, "foo" },
+	};
+
+	cl_git_pass(merge_trees_from_branches(&index, repo,
+		"emptyfile_renames", "emptyfile_renames-branch",
+		opts));
+	cl_assert(merge_test_index(index, merge_index_entries, 4));
+	git_index_free(index);
 }

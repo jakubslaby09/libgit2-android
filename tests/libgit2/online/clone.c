@@ -7,6 +7,7 @@
 #include "refs.h"
 
 #define LIVE_REPO_URL "http://github.com/libgit2/TestGitRepository"
+#define LIVE_REPO_AS_DIR "http:/github.com/libgit2/TestGitRepository"
 #define LIVE_EMPTYREPO_URL "http://github.com/libgit2/TestEmptyRepository"
 #define BB_REPO_URL "https://libgit2-test@bitbucket.org/libgit2-test/testgitrepository.git"
 #define BB_REPO_URL_WITH_PASS "https://libgit2-test:YT77Ppm2nq8w4TYjGS8U@bitbucket.org/libgit2-test/testgitrepository.git"
@@ -72,7 +73,6 @@ void test_online_clone__initialize(void)
 	memset(&g_options, 0, sizeof(git_clone_options));
 	g_options.version = GIT_CLONE_OPTIONS_VERSION;
 	g_options.checkout_opts = dummy_opts;
-	g_options.checkout_opts.checkout_strategy = GIT_CHECKOUT_SAFE;
 	g_options.fetch_opts = dummy_fetch;
 	g_options.fetch_opts.callbacks.certificate_check = ssl_cert;
 
@@ -115,6 +115,16 @@ void test_online_clone__initialize(void)
 
 	if (_remote_expectcontinue)
 		git_libgit2_opts(GIT_OPT_ENABLE_HTTP_EXPECT_CONTINUE, 1);
+
+#if !defined(GIT_WIN32)
+	/*
+	 * On system that allows ':' in filenames "http://path" can be misinterpreted
+	 * as the local path "http:/path".
+	 * Create a local non-repository path that looks like LIVE_REPO_URL to make
+	 * sure we can handle cloning despite this directory being around.
+	 */
+	git_futils_mkdir_r(LIVE_REPO_AS_DIR, 0777);
+#endif
 }
 
 void test_online_clone__cleanup(void)
@@ -126,6 +136,10 @@ void test_online_clone__cleanup(void)
 	cl_fixture_cleanup("./foo");
 	cl_fixture_cleanup("./initial");
 	cl_fixture_cleanup("./subsequent");
+
+#if !defined(GIT_WIN32)
+	cl_fixture_cleanup("http:");
+#endif
 
 	git__free(_remote_url);
 	git__free(_remote_user);
@@ -234,7 +248,6 @@ void test_online_clone__can_checkout_a_cloned_repo(void)
 	bool checkout_progress_cb_was_called = false,
 		  fetch_progress_cb_was_called = false;
 
-	g_options.checkout_opts.checkout_strategy = GIT_CHECKOUT_SAFE;
 	g_options.checkout_opts.progress_cb = &checkout_progress;
 	g_options.checkout_opts.progress_payload = &checkout_progress_cb_was_called;
 	g_options.fetch_opts.callbacks.transfer_progress = &fetch_progress;
@@ -304,10 +317,10 @@ void test_online_clone__clone_mirror(void)
 	cl_fixture_cleanup("./foo.git");
 }
 
-static int update_tips(const char *refname, const git_oid *a, const git_oid *b, void *payload)
+static int update_refs(const char *refname, const git_oid *a, const git_oid *b, git_refspec *spec, void *payload)
 {
 	int *callcount = (int*)payload;
-	GIT_UNUSED(refname); GIT_UNUSED(a); GIT_UNUSED(b);
+	GIT_UNUSED(refname); GIT_UNUSED(a); GIT_UNUSED(b); GIT_UNUSED(spec);
 	*callcount = *callcount + 1;
 	return 0;
 }
@@ -316,7 +329,7 @@ void test_online_clone__custom_remote_callbacks(void)
 {
 	int callcount = 0;
 
-	g_options.fetch_opts.callbacks.update_tips = update_tips;
+	g_options.fetch_opts.callbacks.update_refs = update_refs;
 	g_options.fetch_opts.callbacks.payload = &callcount;
 
 	cl_git_pass(git_clone(&g_repo, LIVE_REPO_URL, "./foo", &g_options));
@@ -650,7 +663,7 @@ static int github_credentials(
 
 void test_online_clone__ssh_github(void)
 {
-#if !defined(GIT_SSH) || !defined(GIT_SSH_MEMORY_CREDENTIALS)
+#if !defined(GIT_SSH) || !defined(GIT_SSH_LIBSSH2_MEMORY_CREDENTIALS)
 	clar__skip();
 #endif
 
@@ -661,6 +674,24 @@ void test_online_clone__ssh_github(void)
 
 	g_options.fetch_opts.callbacks.credentials = github_credentials;
 	g_options.fetch_opts.callbacks.certificate_check = succeed_certificate_check;
+
+	cl_git_pass(git_clone(&g_repo, SSH_REPO_URL, "./foo", &g_options));
+}
+
+void test_online_clone__ssh_github_shallow(void)
+{
+#if !defined(GIT_SSH) || !defined(GIT_SSH_LIBSSH2_MEMORY_CREDENTIALS)
+	clar__skip();
+#endif
+
+	if (!_github_ssh_pubkey || !_github_ssh_privkey)
+		clar__skip();
+
+	cl_fake_homedir(NULL);
+
+	g_options.fetch_opts.callbacks.credentials = github_credentials;
+	g_options.fetch_opts.callbacks.certificate_check = succeed_certificate_check;
+	g_options.fetch_opts.depth = 1;
 
 	cl_git_pass(git_clone(&g_repo, SSH_REPO_URL, "./foo", &g_options));
 }
@@ -691,7 +722,7 @@ void test_online_clone__ssh_auth_methods(void)
  */
 void test_online_clone__ssh_certcheck_accepts_unknown(void)
 {
-#if !defined(GIT_SSH_LIBSSH2) || !defined(GIT_SSH_MEMORY_CREDENTIALS)
+#if !defined(GIT_SSH_LIBSSH2) || !defined(GIT_SSH_LIBSSH2_MEMORY_CREDENTIALS)
 	clar__skip();
 #endif
 
@@ -720,7 +751,7 @@ void test_online_clone__ssh_certcheck_override_knownhosts(void)
 {
 	git_str knownhostsfile = GIT_STR_INIT;
 
-#if !defined(GIT_SSH) || !defined(GIT_SSH_MEMORY_CREDENTIALS)
+#if !defined(GIT_SSH) || !defined(GIT_SSH_LIBSSH2_MEMORY_CREDENTIALS)
 	clar__skip();
 #endif
 
@@ -828,7 +859,7 @@ static int ssh_certificate_check(git_cert *cert, int valid, const char *host, vo
 
 	cl_assert(_remote_ssh_fingerprint);
 
-	cl_git_pass(git_oid__fromstrp(&expected, _remote_ssh_fingerprint, GIT_OID_SHA1));
+	cl_git_pass(git_oid_from_prefix(&expected, _remote_ssh_fingerprint, strlen(_remote_ssh_fingerprint), GIT_OID_SHA1));
 	cl_assert_equal_i(GIT_CERT_HOSTKEY_LIBSSH2, cert->cert_type);
 	key = (git_cert_hostkey *) cert;
 
@@ -914,7 +945,7 @@ static int ssh_memory_cred_cb(git_credential **cred, const char *url, const char
 
 void test_online_clone__ssh_memory_auth(void)
 {
-#ifndef GIT_SSH_MEMORY_CREDENTIALS
+#ifndef GIT_SSH_LIBSSH2_MEMORY_CREDENTIALS
 	clar__skip();
 #endif
 	if (!_remote_url || !_remote_user || !_remote_ssh_privkey || strncmp(_remote_url, "ssh://", 5) != 0)
@@ -1342,7 +1373,7 @@ void test_online_clone__sha256(void)
 
 void test_online_clone__connect_timeout_configurable(void)
 {
-#ifdef GIT_WINHTTP
+#ifdef GIT_HTTPS_WINHTTP
 	cl_skip();
 #else
 	uint64_t start, finish;
@@ -1361,7 +1392,7 @@ void test_online_clone__connect_timeout_configurable(void)
 
 void test_online_clone__connect_timeout_default(void)
 {
-#ifdef GIT_WINHTTP
+#ifdef GIT_HTTPS_WINHTTP
 	cl_skip();
 #else
 	/* This test takes ~ 75 seconds on Unix. */
@@ -1379,7 +1410,7 @@ void test_online_clone__connect_timeout_default(void)
 
 void test_online_clone__timeout_configurable_times_out(void)
 {
-#ifdef GIT_WINHTTP
+#ifdef GIT_HTTPS_WINHTTP
 	cl_skip();
 #else
 	git_repository *failed_repo;
@@ -1396,7 +1427,7 @@ void test_online_clone__timeout_configurable_times_out(void)
 
 void test_online_clone__timeout_configurable_succeeds_slowly(void)
 {
-#ifdef GIT_WINHTTP
+#ifdef GIT_HTTPS_WINHTTP
 	cl_skip();
 #else
 	if (!_remote_speed_slow)

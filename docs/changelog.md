@@ -1,3 +1,817 @@
+v1.9.0
+------
+
+This is release v1.9.0, "Schwibbogen". As usual, it contains numerous
+bug fixes, compatibility improvements, and new features.
+
+This is expected to be the final release in the libgit2 v1.x lineage.
+libgit2 v2.0 is expected to be the next version, with support for
+SHA256 moving to "supported" status (out of "experimental" status).
+This means that v2.0 will have API and ABI changes to support SHA256.
+
+## Major changes
+
+* **Documentation improvements**
+  We've launched a new website for our API reference docs at
+  https://libgit2.org/docs/reference/main/. To support this,
+  we've updated the documentation to ensure that all APIs are
+  well-documented, and added docurium-style specifiers to indicate
+  more depth about the API surface.
+
+  We now also publish a JSON blob with the API structure and the
+  documentation that may be helpful for binding authors.
+
+* **TLS cipher updates**
+  libgit2 has updated our TLS cipher selection to match the
+  "compatibility" cipher suite settings as [documented by
+  Mozilla](https://wiki.mozilla.org/Security/Server_Side_TLS).
+
+* **Blame improvements**
+  The blame API now contains committer information and commit summaries
+  for blame hunks, and the ability to get information about the line of
+  text that was modified. In addition, a CLI blame command has been added
+  so that the blame functionality can be benchmarked by our benchmark
+  suite.
+
+* **More CLI commands**
+  libgit2 has added `blame` and `init` commands, which have allowed for
+  [further benchmarking](https://benchmarks.libgit2.org/) and several API
+  improvements and git compatibility updates.
+
+* **Warning when configuring without SHA1DC**
+  Users are encouraged to use SHA1DC, which is _git's hash_; users
+  should not use SHA1 in the general case. Users will now be warned
+  if they try to configure cmake with a SHA1 backend (`-DUSE_SHA1=...`).
+
+## Breaking changes
+
+There are several ABI-breaking changes that integrators, particularly
+maintainers of bindings or FFI users, may want to be aware of.
+
+* **Blame hunk structure updates** (ABI breaking change)
+  There are numerous additions to the `git_blame_hunk` structure to
+  accommodate more information about the blame process.
+
+* **Checkout strategy updates** (ABI breaking change)
+  The values for `GIT_CHECKOUT_SAFE` and `GIT_CHECKOUT_NONE` have been
+  updated. `GIT_CHECKOUT_SAFE` is now `0`; this was implicitly the
+  default value (with the options constructors setting that as the
+  checkout strategy). It is now the default if the checkout strategy
+  is set to `0`. This allows for an overall code simplification in the
+  library.
+
+* **Configuration entry member removal** (ABI breaking change)
+  The `git_config_entry` structure no longer contains a `free` member;
+  this was an oversight as end-users should not try to free that
+  structure.
+
+* **Configuration backend function changes** (ABI breaking change)
+  `git_config_backend`s should now return `git_config_backend_entry`
+  objects instead of `git_config_entry` objects. This allows backends
+  to provide a mechanism to nicely free the configuration entries that
+  they provide.
+
+* **`update_refs` callback for remotes** (ABI breaking change)
+  The `update_refs` callback was added to the `git_remote_callbacks`
+  structure to provide additional information about updated refs;
+  in particular, the `git_refspec` is included for more information
+  about the remote ref. The `update_refs` callback will be
+  preferred over the now deprecated `update_tips` callback.
+
+## What's Changed
+
+### New features
+
+* The `git_signature_default_from_env` API will now produce a pair
+  of `git_signature`s representing the author, and the committer,
+  taking the `GIT_AUTHOR_NAME` and `GIT_COMMITTER_NAME` environment
+  variables into account. Added by @u-quark in
+  https://github.com/libgit2/libgit2/pull/6706
+
+* packbuilder can now be interrupted from a callback. Added @roberth
+  in https://github.com/libgit2/libgit2/pull/6874
+
+* libgit2 now claims to honor the `preciousObject` repository extension.
+  This extension indicates that the client will never delete objects
+  (in other words, will not garbage collect). libgit2 has no functionality
+  to remove objects, so it implicitly obeys this in all cases. Added
+  by @ethomson in https://github.com/libgit2/libgit2/pull/6886
+
+* Push status will be reported even when a push fails. This is useful
+  to give information from the server about possible updates, even when
+  the overall status failed. Added by @yerseg in
+  https://github.com/libgit2/libgit2/pull/6876
+
+* You can now generate a thin pack from a mempack instance using
+  `git_mempack_write_thin_pack`. Added by @roberth in
+  https://github.com/libgit2/libgit2/pull/6875
+
+* The new `LIBGIT2_VERSION_CHECK` macro will indicate whether the version
+  of libgit2 being compiled against is at least the version specified.
+  For example: `#if LIBGIT2_VERSION_CHECK(1, 6, 3)` is true for libgit2
+  version 1.6.3 or newer. In addition, the new `LIBGIT2_VERSION_NUMBER`
+  macro will return an integer version representing the libgit2 version
+  number. For example, for version 1.6.3, `LIBGIT2_VERSION_NUMBER` will
+  evaluate to `010603`. Added by @HamedMasafi in
+  https://github.com/libgit2/libgit2/pull/6882
+
+* Custom X509 certificates can be added to OpenSSL's certificate store
+  using the `GIT_OPT_ADD_SSL_X509_CERT` option. Added by @yerseg in
+  https://github.com/libgit2/libgit2/pull/6877
+
+* The libgit2 compatibility CLI now has a `git blame` command. Added by
+  @ethomson in https://github.com/libgit2/libgit2/pull/6907
+
+* Remote callbacks now provide an `update_refs` callback so that users
+  can now get the `refspec` of the updated reference during push. This
+  gives more complete information about the remote reference that was
+  updated. Added by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6559
+
+* An optional FIPS-compliant mode for hashing is now available; you
+  can set `-DUSE_SHA256=OpenSSL-FIPS` to enable it. Added by @marcind-dot
+  in https://github.com/libgit2/libgit2/pull/6906
+
+* The git-compatible CLI now supports the `git init` command, which has
+  been useful in identifying API improvements and incompatibilities with
+  git. Added by @ethomson in https://github.com/libgit2/libgit2/pull/6984
+
+* Consumers can now query more information about how libgit2 was
+  compiled, and query the "backends" that libgit2 uses. Added by
+  @ethomson in https://github.com/libgit2/libgit2/pull/6971
+
+### Bug fixes
+
+* Fix constness issue introduced in #6716 by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6829
+* odb: conditional `git_hash_ctx_cleanup` in `git_odb_stream` by
+  @gensmusic in https://github.com/libgit2/libgit2/pull/6836
+* Fix shallow root maintenance during fetch by @kcsaul in
+  https://github.com/libgit2/libgit2/pull/6846
+* Headers cleanup by @anatol in
+  https://github.com/libgit2/libgit2/pull/6842
+* http: Initialize `on_status` when using the http-parser backend by
+  @civodul in https://github.com/libgit2/libgit2/pull/6870
+* Leak in `truncate_racily_clean` in index.c by @lstoppa in
+  https://github.com/libgit2/libgit2/pull/6884
+* ssh: Omit port option from ssh command unless specified in remote url
+  by @jayong93 in https://github.com/libgit2/libgit2/pull/6845
+* diff: print the file header on `GIT_DIFF_FORMAT_PATCH_HEADER` by
+  @carlosmn in https://github.com/libgit2/libgit2/pull/6888
+* Add more robust reporting to SecureTransport errors on macos by
+  @vcfxb in https://github.com/libgit2/libgit2/pull/6848
+* transport: do not filter tags based on ref dir in local by @rindeal
+  in https://github.com/libgit2/libgit2/pull/6881
+* push: handle tags to blobs by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6898
+* Fixes for OpenSSL dynamic by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6901
+* realpath: unbreak build on OpenBSD by @ajacoutot in
+  https://github.com/libgit2/libgit2/pull/6932
+* util/win32: Continue if access is denied when deleting a folder by
+  @lrm29 in https://github.com/libgit2/libgit2/pull/6929
+* object: `git_object_short_id` fails with core.abbrev string values by
+  @lrm29 in https://github.com/libgit2/libgit2/pull/6944
+* Clear data after negotiation by @lrm29 in
+  https://github.com/libgit2/libgit2/pull/6947
+* smart: ignore shallow/unshallow packets during ACK processing by
+  @kempniu in https://github.com/libgit2/libgit2/pull/6973
+
+### Security fixes
+
+* ssh: Include rsa-sha2-256 and rsa-sha2-512 in the list of hostkey types
+  by @lrm29 in https://github.com/libgit2/libgit2/pull/6938
+* TLS: v1.2 and updated cipher list by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6960
+
+### Code cleanups
+
+* checkout: make safe checkout the default by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6037
+* url: track whether url explicitly specified a port by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6851
+* config: remove `free` ptr from `git_config_entry` by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6804
+* Add SecCopyErrorMessageString for iOS and update README for iOS by
+  @Kyle-Ye in https://github.com/libgit2/libgit2/pull/6862
+* vector: free is now dispose by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6896
+* hashmap: a libgit2-idiomatic khash by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6897
+* hashmap: asserts by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6902
+* hashmap: further asserts by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6904
+* Make `GIT_WIN32` an internal declaration by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6940
+* pathspec: additional pathspec wildcard tests by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6959
+* repo: don't require option when `template_path` is specified by @ethomson
+  in https://github.com/libgit2/libgit2/pull/6983
+* options: update X509 cert constant by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6974
+* remote: Handle fetching negative refspecs by @ryan-ph in
+  https://github.com/libgit2/libgit2/pull/6962
+* Restore tls v1.0 support temporarily by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6964
+* SHA256 improvements by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6965
+
+### Benchmarks
+
+* Add benchmarks for blame by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6920
+
+### Build and CI improvements
+
+* README: add experimental builds to ci table by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6816
+* Update stransport.c by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6891
+* stransport: initialize for iOS by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6893
+* CI updates by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6895
+* Configurable C standard by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6911
+* cmake: update python locator by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6915
+* ci: don't run Windows SHA256 gitdaemon tests by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6916
+* cmake-standard c standards by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6914
+* ci: don't run Windows SHA256 gitdaemon tests by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6919
+* Improve dependency selection in CMake by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6924
+* ci: port latest fixes to nightlies by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6926
+* cmake: warn for not using sha1dc by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6986
+
+### Documentation improvements
+
+* Fix docs for `git_odb_stream_read` return value. by @ehuss in
+  https://github.com/libgit2/libgit2/pull/6837
+* docs: Add instructions to build examples by @thymusvulgaris in
+  https://github.com/libgit2/libgit2/pull/6839
+* Fix contradictory phrase in SECURITY.md by @Kyle-Ye in
+  https://github.com/libgit2/libgit2/pull/6859
+* Update README.md by @Kyle-Ye in
+  https://github.com/libgit2/libgit2/pull/6860
+* README updates by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6908
+* typo: s/size on bytes/size in bytes/ by @John-Colvin in
+  https://github.com/libgit2/libgit2/pull/6909
+* readme: add OpenSSF best practices badge by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6925
+* Update documentation of `merge_base_many` by @Caleb-T-Owens in
+  https://github.com/libgit2/libgit2/pull/6927
+* Include documentation generator by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6945
+* Update documentation generation workflow by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6948
+* Improve documentation and validate during CI by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6949
+* Add search functionality to our docs generator by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6953
+* Documentation: don't resort versions by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6954
+* Documentation: update `refdb_backend` docs by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6955
+* Documentation: clean up old documentation by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6957
+* docs: remind people about `git_libgit2_init` by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6958
+* Update changelog with v1.8.4 content by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6961
+
+### Git compatibility fixes
+
+* Limit `.gitattributes` and `.gitignore` files to 100 MiB by @csware in
+  https://github.com/libgit2/libgit2/pull/6834
+* refs: Handle normalizing negative refspecs by @ryan-ph in
+  https://github.com/libgit2/libgit2/pull/6951
+* repo: put a newline on the .git link file by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6981
+
+### Dependency updates
+
+* zlib: update bundled zlib to v1.3.1 by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6905
+* Update ntlmclient dependency by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6912
+
+### Other changes
+
+* Create FUNDING.json by @BenJam in
+  https://github.com/libgit2/libgit2/pull/6853
+
+## New Contributors
+
+* @gensmusic made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6836
+* @u-quark made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6706
+* @thymusvulgaris made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6839
+* @anatol made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6842
+* @BenJam made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6853
+* @Kyle-Ye made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6859
+* @civodul made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6870
+* @lstoppa made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6884
+* @jayong93 made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6845
+* @roberth made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6874
+* @vcfxb made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6848
+* @yerseg made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6876
+* @rindeal made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6881
+* @HamedMasafi made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6882
+* @John-Colvin made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6909
+* @marcind-dot made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6906
+* @ajacoutot made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6932
+* @Caleb-T-Owens made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6927
+* @ryan-ph made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6951
+* @bmarques1995 made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6840
+
+**Full Changelog**: https://github.com/libgit2/libgit2/compare/v1.8.4...v1.9.0
+
+v1.8.4
+------
+
+We erroneously shipped v1.8.3 without actually including the change
+in v1.8.2. This release re-re-introduces the pre-v1.8.0 `commit`
+constness behavior.
+
+## What's Changed
+
+### Bug fixes
+
+* Fix constness issue introduced in #6716 by @ethomson in https://github.com/libgit2/libgit2/pull/6829
+
+**Full Changelog**: https://github.com/libgit2/libgit2/compare/v1.8.3...v1.8.4
+
+v1.8.3
+------
+
+This release fixes a bug introduced in v1.8.1 for users of the legacy
+[Node.js http-parser](https://github.com/nodejs/http-parser)
+dependency.
+
+## What's Changed
+
+### Bug fixes
+
+* http: Backport on_status initialize fix for http-parser by @ethomson in https://github.com/libgit2/libgit2/pull/6931
+
+v1.8.2
+------
+
+This release reverts a const-correctness change introduced in
+v1.8.0 for the `git_commit_create` functions. We now retain the
+const-behavior for the `commits` arguments from prior to v1.8.0.
+
+This change was meant to resolve compatibility issues with bindings
+and downstream users.
+
+## What's Changed
+
+### New features
+
+* Introduce a stricter debugging allocator for testing by @ethomson in https://github.com/libgit2/libgit2/pull/6811
+
+### Bug fixes
+
+* Fix constness issue introduced in #6716 by @ethomson in https://github.com/libgit2/libgit2/pull/6829
+
+### Build and CI improvements
+
+* README: add experimental builds to ci table by @ethomson in https://github.com/libgit2/libgit2/pull/6816
+
+**Full Changelog**: https://github.com/libgit2/libgit2/compare/v1.8.1...v1.8.2
+
+v1.8.1
+------
+
+This release primarily includes straightforward bugfixes, as well as
+new functionality to have more control over the HTTP User-Agent header.
+However, there is an API change from v1.8 that was required for
+improved compatibility.
+
+In v1.8, libgit2 introduced the `report_unchanged ` member in the
+`git_fetch_options` structure. We mistakenly introduced this as a
+bitfield, which is not suitable for our public API. To correct this
+mistake, we have _removed_ the `report_unchanged ` member. To support
+the report unchanged tips option, users can set the `update_fetchhead`
+member to include the `GIT_REMOTE_UPDATE_REPORT_UNCHANGED` value.
+
+The libgit2 projects regrets the API change, but this was required to
+support cross-platform compatibility.
+
+## What's Changed
+
+### New features
+
+* Allow more control over the user-agent by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6788
+
+### Bug fixes
+
+* commit: Fix git_commit_create_from_stage without author and
+  committer by @florianpircher in
+  https://github.com/libgit2/libgit2/pull/6781
+* process.c: fix environ for macOS by @barracuda156 in
+  https://github.com/libgit2/libgit2/pull/6792
+* Bounds check for pack index read by @ConradIrwin in
+  https://github.com/libgit2/libgit2/pull/6796
+* transport: provide a useful error message during cancellation
+  by @ethomson in https://github.com/libgit2/libgit2/pull/6802
+* transport: support sha256 oids by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6803
+* Revparse: Correctly accept ref with '@' at the end by @csware in
+  https://github.com/libgit2/libgit2/pull/6809
+* remote: drop bitfields in git_remote_fetch_options by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6806
+* examples: fix memory leak in for-each-ref.c by @qaqland in
+  https://github.com/libgit2/libgit2/pull/6808
+* xdiff: use proper free function by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6810
+* rand: avoid uninitialized loadavg warnings by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6812
+* cli: include alloca on illumos / solaris / sunos by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6813
+* Update git_array allocator to obey strict aliasing rules
+  by @ethomson in https://github.com/libgit2/libgit2/pull/6814
+* tree: avoid mixed signedness comparison by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6815
+
+### Build and CI improvements
+
+* ci: update nightly workflows by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6773
+* ci: give all nightly builds a unique id by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6782
+* cmake: remove workaround that isn't compatible with Windows on
+  ARM by @hackhaslam in https://github.com/libgit2/libgit2/pull/6794
+
+### Documentation improvements
+
+* Docs meta-updates by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6787
+
+### Dependency updates
+
+* Enable llhttp for HTTP parsing by @sgallagher in
+  https://github.com/libgit2/libgit2/pull/6713
+
+## New Contributors
+
+* @florianpircher made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6781
+* @barracuda156 made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6792
+* @sgallagher made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6713
+* @ConradIrwin made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6796
+* @qaqland made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6808
+
+**Full Changelog**: https://github.com/libgit2/libgit2/compare/v1.8.0...v1.8.1
+
+v1.8
+----
+
+This is release v1.8.0, "Das Fliegende Klassenzimmer". This release
+includes optional, experimental support for invoking OpenSSH to fetch
+and push, an easier mechanism to perform the default behavior of
+`git commit`, and has many improvements for worktrees. This release
+also includes many other new features and bugfixes.
+
+## Major changes
+
+* **Executable SSH (OpenSSH) support**
+   libgit2 can now invoke the command-line OpenSSH to fetch from and push
+   to remotes over SSH. This support takes the place of libssh2 support.
+   To use it, configure libgit2 with `cmake -DUSE_SSH=exec`, and please
+   report any problems that you discover. By @ethomson in
+   https://github.com/libgit2/libgit2/pull/6617
+
+* **Simplified commit creation**
+   The `git_commit_create_from_stage` API was introduced to allow users to
+   better emulate the behavior of `git commit` without needing to provide
+   unnecessary information. The current state of the index is committed to
+   the current branch. By @ethomson in
+   https://github.com/libgit2/libgit2/pull/6716
+
+* **Worktree improvements**
+   A number of worktree improvements have been made for better
+   compatibility with core git. First, libgit2 now understands per-worktree
+   references, thanks to @csware in
+   https://github.com/libgit2/libgit2/pull/6387. Worktree-specific
+   configuration is now supported, thanks to @vermiculus in
+   https://github.com/libgit2/libgit2/pull/6202. And improved compatibility
+   with `git worktree add` is now supported, thanks to @herrerog in
+   https://github.com/libgit2/libgit2/pull/5319.
+
+## Breaking changes
+
+* **Adding `WORKTREE` configuration level** (ABI breaking change)
+  To support worktree configurations at the appropriate level (higher
+  priority than local configuration, but lower priority than app-specific
+  configuration), the `GIT_CONFIG_LEVEL_WORKTREE` level was introduced at
+  priority 6. `GIT_CONFIG_LEVEL_APP` now begins at priority 7.
+
+* **Changes to `git_config_entry`** (ABI breaking change)
+  The `git_config_entry` structure now contains information about the
+  `backend_type` and `origin_path`. The unused `payload` value has been
+  removed.
+
+* **`git_push_options` includes remote push options** (ABI breaking change)
+  The `git_push_options` structure now contains a value for remote push
+  options.
+
+## Other changes
+
+### New features
+
+* config: provide an "origin" for config entries by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6615
+* cli: add a `git config` command by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6616
+* Add OpenSSH support by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6617
+* remote: optionally report unchanged tips by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6645
+* Support setting oid type for in-memory repositories by @kcsaul in
+  https://github.com/libgit2/libgit2/pull/6671
+* cli: add `index-pack` command by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6681
+* Add `git_repository_commit_parents` to identify the parents of the next
+  commit given the repository state by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6707
+* commit: introduce `git_commit_create_from_stage` by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6716
+* set SSH timeout by @vafada in
+  https://github.com/libgit2/libgit2/pull/6721
+* Implement push options on push by @russell in
+  https://github.com/libgit2/libgit2/pull/6439
+* Support index.skipHash true config by @parnic in
+  https://github.com/libgit2/libgit2/pull/6738
+* worktree: mimic 'git worktree add' behavior. by @herrerog in
+  https://github.com/libgit2/libgit2/pull/5319
+* Support the extension for worktree-specific config by @vermiculus in
+  https://github.com/libgit2/libgit2/pull/6202
+* Separate config reader and writer backend priorities (for worktree
+  configs) by @ethomson in https://github.com/libgit2/libgit2/pull/6756
+* fetch: enable deepening/shortening shallow clones by @kempniu in
+  https://github.com/libgit2/libgit2/pull/6662
+
+### Bug fixes
+
+* repository: make cleanup safe for re-use with grafts by @carlosmn in
+  https://github.com/libgit2/libgit2/pull/6600
+* fix: Add missing include for `oidarray`. by @dvzrv in
+  https://github.com/libgit2/libgit2/pull/6608
+* ssh: fix `known_hosts` leak in `_git_ssh_setup_conn` by @steven9724 in
+  https://github.com/libgit2/libgit2/pull/6599
+* proxy: Return an error for invalid proxy URLs instead of crashing by
+  @lrm29 in https://github.com/libgit2/libgit2/pull/6597
+* errors: refactoring - never return `NULL` in `git_error_last()` by
+  @ethomson in https://github.com/libgit2/libgit2/pull/6625
+* Reject potential option injections over ssh by @carlosmn in
+  https://github.com/libgit2/libgit2/pull/6636
+* remote: fix memory leak in `git_remote_download()` by @7Ji in
+  https://github.com/libgit2/libgit2/pull/6651
+* git2: Fix crash when called w/o parameters by @csware in
+  https://github.com/libgit2/libgit2/pull/6673
+* Avoid macro redefinition of `ENABLE_INTSAFE_SIGNED_FUNCTIONS` by @csware
+  in https://github.com/libgit2/libgit2/pull/6666
+* util: suppress some uninitialized variable warnings by @boretrk in
+  https://github.com/libgit2/libgit2/pull/6659
+* push: set generic error in `push_negotiation` cb by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6675
+* process: test `/usr/bin/false` on BSDs by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6677
+* clone: don't mix up "http://url" with "http:/url" when figuring out if we
+  should do a local clone by @boretrk in
+  https://github.com/libgit2/libgit2/pull/6361
+* Several compatibility fixes by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6678
+* Git blame buffer gives the wrong result in many cases where there are
+  by @thosey in https://github.com/libgit2/libgit2/pull/6572
+* Fix 'path cannot exist in repository' during diff for in-memory repository
+  by @kcsaul in https://github.com/libgit2/libgit2/pull/6683
+* process: don't try to close the status by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6693
+* Minor bug fixes by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6695
+* Bypass shallow clone support for in-memory repositories by @kcsaul in
+  https://github.com/libgit2/libgit2/pull/6684
+* examples: use `unsigned` int for bitfields by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6699
+* Fix some bugs caught by UBscan by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6700
+* `git_diff_find_similar` doesn't always remove unmodified deltas by @yori
+  in https://github.com/libgit2/libgit2/pull/6642
+* httpclient: clear `client->parser.data` after use by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6705
+* Do not normalize `safe.directory` paths by @csware in
+  https://github.com/libgit2/libgit2/pull/6668
+* clone: don't swallow error in `should_checkout` by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6727
+* Correct index add directory/file conflict detection by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6729
+* Correct `git_revparse_single` and add revparse fuzzing by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6730
+* config: properly delete or rename section containing multivars by
+  @samueltardieu in https://github.com/libgit2/libgit2/pull/6723
+* revparse: ensure bare '@' is truly bare by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6742
+* repo: ensure we can initialize win32 paths by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6743
+* Swap `GIT_DIFF_LINE_(ADD|DEL)_EOFNL` to match other Diffs by @xphoniex in
+  https://github.com/libgit2/libgit2/pull/6240
+* diff: fix test for SHA256 support in `diff_from_buffer` by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6745
+* http: support empty http.proxy config setting by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6744
+* More `safe.directory` improvements by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6739
+* Ensure that completely ignored diff is empty by @ethomson in
+  https://github.com/libgit2/libgit2/pull/5893
+* Fix broken regexp that matches submodule names containing ".path" by
+  @csware in https://github.com/libgit2/libgit2/pull/6749
+* Fix memory leaks by @csware in
+  https://github.com/libgit2/libgit2/pull/6748
+* Make `refdb_fs` (hopefully) fully aware of per worktree refs by @csware in
+  https://github.com/libgit2/libgit2/pull/6387
+* fix log example by @albfan in https://github.com/libgit2/libgit2/pull/6359
+* fetch: fail on depth for local transport by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6757
+* Fix message trailer parsing by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6761
+* config: correct fetching the `HIGHEST_LEVEL` config by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6766
+* Avoid some API breaking changes in v1.8 by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6768
+
+### Build and CI improvements
+
+* meta: update version numbers to v1.8 by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6596
+* Revert "CMake: Search for ssh2 instead of libssh2." by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6619
+* cmake: fix openssl build on win32 by @lazka in
+  https://github.com/libgit2/libgit2/pull/6626
+* ci: retry flaky online tests by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6628
+* ci: update to macOS 12 by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6629
+* Use `#!/bin/bash` for script with bash-specific commands by @roehling in
+  https://github.com/libgit2/libgit2/pull/6581
+* ci: overwrite nonsense in `/usr/local` during macOS setup by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6664
+* release: add a compatibility label by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6676
+* actions: set permissions by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6680
+* cmake: rename FindIconv to avoid collision with cmake by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6682
+* ci: allow workflows to read and write packages by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6687
+* ci: allow workflows to push changes by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6688
+* tests: remove test for strcasecmp by @boretrk in
+  https://github.com/libgit2/libgit2/pull/6691
+* CI fixes by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6694
+* ci: improvements to prepare for Cygwin support by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6696
+* Yet more CI improvements by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6697
+* Fix nightly builds by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6709
+* Benchmarks: add a site to view results by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6715
+* `GIT_RAND_GETENTROPY`: do not include `sys/random.h` by @semarie in
+  https://github.com/libgit2/libgit2/pull/6736
+* add dl to `LIBGIT2_SYSTEM_LIBS` by @christopherfujino in
+  https://github.com/libgit2/libgit2/pull/6631
+* meta: add dependency tag to release.yml by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6740
+* CI: fix our nightlies by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6751
+* trace: Re-enable tests as tracing is now enabled by default by @lrm29 in
+  https://github.com/libgit2/libgit2/pull/6752
+* tests: don't free an unininitialized repo by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6763
+* ci: reduce ASLR randomization for TSAN by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6764
+* packbuilder: adjust nondeterministic tests by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6762
+* Allow libgit2 to be compiled with mbedtls3. by @adamharrison in
+  https://github.com/libgit2/libgit2/pull/6759
+* build: update to latest actions versions by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6765
+* ctype: cast characters to unsigned when classifying characters by
+  @boretrk in https://github.com/libgit2/libgit2/pull/6679 and
+  @ethomson in https://github.com/libgit2/libgit2/pull/6770
+* valgrind: suppress OpenSSL warnings by @ethomson in https://github.com/libgit2/libgit2/pull/6769
+
+### Documentation improvements
+
+* README.md: Fix link to conan packages by @lrm29 in
+  https://github.com/libgit2/libgit2/pull/6621
+* README: replace gmaster with GitButler by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6692
+* blame example: Fix support for line range in CLI by @wetneb in
+  https://github.com/libgit2/libgit2/pull/6638
+* Support authentication in push example by @pluehne in
+  https://github.com/libgit2/libgit2/pull/5904
+* docs: fix mistake in attr.h by @DavHau in
+  https://github.com/libgit2/libgit2/pull/6714
+* Fix broken links by @csware in
+  https://github.com/libgit2/libgit2/pull/6747
+
+### Platform compatibility fixes
+
+* stransport: macOS: replace `errSSLNetworkTimeout`, with hard-coded
+  value by @mascguy in https://github.com/libgit2/libgit2/pull/6610
+
+### Git compatibility fixes
+
+* Do not trim dots from usernames by @georgthegreat in
+  https://github.com/libgit2/libgit2/pull/6657
+* merge: fix incorrect rename detection for empty files by @herrerog in
+  https://github.com/libgit2/libgit2/pull/6717
+
+### Dependency updates
+
+* zlib: upgrade bundled zlib to v1.3 by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6698
+* ntlmclient: update to latest upstream ntlmclient by @ethomson in
+  https://github.com/libgit2/libgit2/pull/6704
+
+## New Contributors
+
+* @dvzrv made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6608
+* @mascguy made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6610
+* @steven9724 made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6599
+* @lazka made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6626
+* @roehling made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6581
+* @7Ji made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6651
+* @kempniu made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6662
+* @thosey made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6572
+* @wetneb made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6638
+* @yori made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6642
+* @pluehne made their first contribution in
+  https://github.com/libgit2/libgit2/pull/5904
+* @DavHau made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6714
+* @vafada made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6721
+* @semarie made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6736
+* @christopherfujino made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6631
+* @parnic made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6738
+* @samueltardieu made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6723
+* @xphoniex made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6240
+* @adamharrison made their first contribution in
+  https://github.com/libgit2/libgit2/pull/6759
+
+**Full Changelog**: https://github.com/libgit2/libgit2/compare/v1.7.0...v1.8.0
+
 v1.7
 ----
 

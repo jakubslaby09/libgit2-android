@@ -87,6 +87,29 @@ extern int git_fs_path_to_dir(git_str *path);
 extern void git_fs_path_string_to_dir(char *path, size_t size);
 
 /**
+ * Provides the length of the given path string with no trailing
+ * slashes.
+ */
+size_t git_fs_path_dirlen(const char *path);
+
+/**
+ * Returns nonzero if the given path is a filesystem root; on Windows, this
+ * means a drive letter (eg `A:/`, `C:\`). On POSIX this is `/`.
+ */
+GIT_INLINE(int) git_fs_path_is_root(const char *name)
+{
+#ifdef GIT_WIN32
+	if (((name[0] >= 'A' && name[0] <= 'Z') || (name[0] >= 'a' && name[0] <= 'z')) &&
+	      name[1] == ':' &&
+	     (name[2] == '/' || name[2] == '\\') &&
+	      name[3] == '\0')
+		return 1;
+#endif
+
+	return (name[0] == '/' && name[1] == '\0');
+}
+
+/**
  * Taken from git.git; returns nonzero if the given path is "." or "..".
  */
 GIT_INLINE(int) git_fs_path_is_dot_or_dotdot(const char *name)
@@ -426,7 +449,7 @@ extern bool git_fs_path_has_non_ascii(const char *path, size_t pathlen);
 #define GIT_PATH_NATIVE_ENCODING "UTF-8"
 #endif
 
-#ifdef GIT_USE_ICONV
+#ifdef GIT_I18N_ICONV
 
 #include <iconv.h>
 
@@ -450,7 +473,7 @@ extern void git_fs_path_iconv_clear(git_fs_path_iconv_t *ic);
  */
 extern int git_fs_path_iconv(git_fs_path_iconv_t *ic, const char **in, size_t *inlen);
 
-#endif /* GIT_USE_ICONV */
+#endif /* GIT_I18N_ICONV */
 
 extern bool git_fs_path_does_decompose_unicode(const char *root);
 
@@ -488,7 +511,7 @@ struct git_fs_path_diriter
 
 	DIR *dir;
 
-#ifdef GIT_USE_ICONV
+#ifdef GIT_I18N_ICONV
 	git_fs_path_iconv_t ic;
 #endif
 };

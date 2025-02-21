@@ -178,7 +178,7 @@ static int parse_header_oid(
 	}
 
 	if (len < GIT_OID_MINPREFIXLEN || len > hexsize ||
-		git_oid__fromstrn(oid, ctx->parse_ctx.line, len, ctx->opts.oid_type) < 0)
+		git_oid_from_prefix(oid, ctx->parse_ctx.line, len, ctx->opts.oid_type) < 0)
 		return git_parse_err("invalid hex formatted object id at line %"PRIuZ,
 			ctx->parse_ctx.line_num);
 
@@ -562,9 +562,9 @@ fail:
 
 static int eof_for_origin(int origin) {
 	if (origin == GIT_DIFF_LINE_ADDITION)
-		return GIT_DIFF_LINE_ADD_EOFNL;
-	if (origin == GIT_DIFF_LINE_DELETION)
 		return GIT_DIFF_LINE_DEL_EOFNL;
+	if (origin == GIT_DIFF_LINE_DELETION)
+		return GIT_DIFF_LINE_ADD_EOFNL;
 	return GIT_DIFF_LINE_CONTEXT_EOFNL;
 }
 

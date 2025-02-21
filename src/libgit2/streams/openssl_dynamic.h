@@ -149,7 +149,7 @@
 #ifndef INCLUDE_streams_openssl_dynamic_h__
 #define INCLUDE_streams_openssl_dynamic_h__
 
-#ifdef GIT_OPENSSL_DYNAMIC
+#ifdef GIT_HTTPS_OPENSSL_DYNAMIC
 
 # define BIO_CTRL_FLUSH               11
 
@@ -182,6 +182,8 @@
 # define SSL_OP_NO_COMPRESSION        0x00020000L
 # define SSL_OP_NO_SSLv2              0x01000000L
 # define SSL_OP_NO_SSLv3              0x02000000L
+# define SSL_OP_NO_TLSv1              0x04000000L
+# define SSL_OP_NO_TLSv1_1            0x10000000L
 
 # define SSL_MODE_AUTO_RETRY          0x00000004L
 
@@ -204,6 +206,7 @@ typedef void SSL_METHOD;
 typedef void X509;
 typedef void X509_NAME;
 typedef void X509_NAME_ENTRY;
+typedef void X509_STORE;
 typedef void X509_STORE_CTX;
 
 typedef struct {
@@ -309,6 +312,7 @@ extern int (*SSL_write)(SSL *ssl, const void *buf, int num);
 extern long (*SSL_CTX_ctrl)(SSL_CTX *ctx, int cmd, long larg, void *parg);
 extern void (*SSL_CTX_free)(SSL_CTX *ctx);
 extern SSL_CTX *(*SSL_CTX_new)(const SSL_METHOD *method);
+extern X509_STORE *(*SSL_CTX_get_cert_store)(const SSL_CTX *ctx);
 extern int (*SSL_CTX_set_cipher_list)(SSL_CTX *ctx, const char *str);
 extern int (*SSL_CTX_set_default_verify_paths)(SSL_CTX *ctx);
 extern long (*SSL_CTX_set_options)(SSL_CTX *ctx, long options);
@@ -326,6 +330,7 @@ extern int (*X509_NAME_get_index_by_NID)(X509_NAME *name, int nid, int lastpos);
 extern void (*X509_free)(X509 *a);
 extern void *(*X509_get_ext_d2i)(const X509 *x, int nid, int *crit, int *idx);
 extern X509_NAME *(*X509_get_subject_name)(const X509 *x);
+extern int (*X509_STORE_add_cert)(X509_STORE *ctx, X509 *x);
 
 extern int (*i2d_X509)(X509 *a, unsigned char **ppout);
 
@@ -343,6 +348,6 @@ extern void GENERAL_NAMES_free(GENERAL_NAME *sk);
 
 extern int git_openssl_stream_dynamic_init(void);
 
-#endif /* GIT_OPENSSL_DYNAMIC */
+#endif /* GIT_HTTPS_OPENSSL_DYNAMIC */
 
 #endif

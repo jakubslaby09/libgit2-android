@@ -7,9 +7,8 @@
 
 #include "common.h"
 
-#ifndef GIT_WINHTTP
+#ifndef GIT_HTTPS_WINHTTP
 
-#include "http_parser.h"
 #include "net.h"
 #include "remote.h"
 #include "smart.h"
@@ -334,7 +333,7 @@ static int lookup_proxy(
 		return 0;
 	}
 
-	if (!proxy ||
+	if (!proxy || !*proxy ||
 	    (error = git_net_url_parse_http(&transport->proxy.url, proxy)) < 0)
 		goto done;
 
@@ -763,4 +762,4 @@ int git_smart_subtransport_http(git_smart_subtransport **out, git_transport *own
 	return 0;
 }
 
-#endif /* !GIT_WINHTTP */
+#endif /* !GIT_HTTPS_WINHTTP */

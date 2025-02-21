@@ -23,7 +23,7 @@ static int maybe_sha_or_abbrev(
 {
 	git_oid oid;
 
-	if (git_oid__fromstrn(&oid, spec, speclen, repo->oid_type) < 0)
+	if (git_oid_from_prefix(&oid, spec, speclen, repo->oid_type) < 0)
 		return GIT_ENOTFOUND;
 
 	return git_object_lookup_prefix(out, repo, &oid, speclen, GIT_OBJECT_ANY);
@@ -701,6 +701,7 @@ static int revparse(
 	git_object *base_rev = NULL;
 
 	bool should_return_reference = true;
+	bool parsed = false;
 
 	GIT_ASSERT_ARG(object_out);
 	GIT_ASSERT_ARG(reference_out);
@@ -710,7 +711,7 @@ static int revparse(
 	*object_out = NULL;
 	*reference_out = NULL;
 
-	while (spec[pos]) {
+	while (!parsed && spec[pos]) {
 		switch (spec[pos]) {
 		case '^':
 			should_return_reference = false;
@@ -815,8 +816,10 @@ static int revparse(
 				if (temp_object != NULL)
 					base_rev = temp_object;
 				break;
-			} else if (spec[pos+1] == '\0') {
+			} else if (spec[pos + 1] == '\0' && !pos) {
 				spec = "HEAD";
+				identifier_len = 4;
+				parsed = true;
 				break;
 			}
 			/* fall through */
@@ -932,7 +935,7 @@ int git_revparse(
 		 * allowed.
 		 */
 		if (!git__strcmp(spec, "..")) {
-			git_error_set(GIT_ERROR_INVALID, "Invalid pattern '..'");
+			git_error_set(GIT_ERROR_INVALID, "invalid pattern '..'");
 			return GIT_EINVALIDSPEC;
 		}
 

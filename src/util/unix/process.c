@@ -15,7 +15,12 @@
 #include "process.h"
 #include "strlist.h"
 
-extern char **environ;
+#ifdef __APPLE__
+	#include <crt_externs.h>
+	#define environ (*_NSGetEnviron())
+#else
+	extern char **environ;
+#endif
 
 struct git_process {
 	char **args;
@@ -37,7 +42,7 @@ struct git_process {
 
 GIT_INLINE(bool) is_delete_env(const char *env)
 {
-	char *c = index(env, '=');
+	char *c = strchr(env, '=');
 
 	if (c == NULL)
 		return false;
@@ -99,7 +104,7 @@ static int merge_env(
 	return 0;
 
 on_error:
-	git_vector_free_deep(&merged);
+	git_vector_dispose_deep(&merged);
 	return error;
 }
 
@@ -121,7 +126,7 @@ int git_process_new(
 	GIT_ERROR_CHECK_ALLOC(process);
 
 	if (git_strlist_copy_with_null(&process->args, args, args_len) < 0 ||
-	    merge_env(&process->env, env, env_len, opts->exclude_env) < 0) {
+	    merge_env(&process->env, env, env_len, opts ? opts->exclude_env : false) < 0) {
 		git_process_free(process);
 		return -1;
 	}
@@ -556,7 +561,6 @@ int git_process_close(git_process *process)
 	CLOSE_FD(process->child_in);
 	CLOSE_FD(process->child_out);
 	CLOSE_FD(process->child_err);
-	CLOSE_FD(process->status);
 
 	return 0;
 }
