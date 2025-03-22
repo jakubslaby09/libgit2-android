@@ -11,7 +11,7 @@ If anyone else wants to use this fork, keep in mind that there is a **dangerous 
    ```sh
    cd openssl
    PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin:$ANDROID_NDK_ROOT/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/bin:$PATH
-   ./Configure android-arm64 -D__ANDROID_API__=34 # if you need to, you can change the API verson here
+   ./Configure android-arm64 -D__ANDROID_API__=34 # if you need to, you can change the API version here
    make -s -Wno-macro-redefined
    cd ..
    ```
